@@ -10,12 +10,14 @@ import cyborg.Units.Ltrb
 import android.text.{Editable, TextWatcher}
 
 trait TextViewTrait extends android.widget.TextView with ViewTrait {
-  protected val defaultTextWatcher = new TextWatcher {
+  class DefaultTextWatcher extends TextWatcher {
     var onTextChangedFun: Option[() => Unit] = None
     def beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {}
     def onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) { onTextChangedFun.map(_()) }
     def afterTextChanged(s: Editable) {}
   }
+
+  protected val defaultTextWatcher = new DefaultTextWatcher
 
   def colour: Int = getCurrentTextColor
   def colour_=(colour: Int) { setTextColor(colour) }
@@ -32,6 +34,11 @@ trait TextViewTrait extends android.widget.TextView with ViewTrait {
   def imeOptions_=(o: Int) { setImeOptions(o) }
   def inputType = getInputType
   def inputType_=(it: Int) { setInputType(it) }
+  def singleLine: Boolean = throw new Exception("not implemented")
+  def singleLine_=(s: Boolean) { setSingleLine(s) }
+
+  def gravity: Int = getGravity
+  def gravity_=(g: Int) { setGravity(g) }
 
   def lineSpacing(add: Double, mult: Double) { setLineSpacing(add.toFloat, mult.toFloat) }
 

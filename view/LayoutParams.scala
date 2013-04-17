@@ -66,6 +66,4 @@ object LayoutParams {
   def alignLeftWith(that: ViewTrait)(implicit layoutParams: RLLP) { layoutParams.addRule(RL.ALIGN_LEFT, that.id) }
   def alignRightWith(that: ViewTrait)(implicit layoutParams: RLLP) { layoutParams.addRule(RL.ALIGN_RIGHT, that.id) }
 
-
-
 }
