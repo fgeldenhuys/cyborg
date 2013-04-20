@@ -1,6 +1,7 @@
 package cyborg
 
 import Context._
+import android.view.View
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -18,6 +19,8 @@ class Activity extends android.app.Activity {
       def run() { f }
     })
   }
+
+  def findView[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
 }
 
 object Activity {

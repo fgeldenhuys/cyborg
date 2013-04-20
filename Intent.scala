@@ -2,7 +2,7 @@ package cyborg
 
 import cyborg.Context._
 
-class Intent(val self: android.content.Intent) /* extends AnyVal */ {
+class Intent(val self: android.content.Intent) extends AnyVal {
   def start(implicit activity: Activity) { activity.startActivity(self) }
   def start(activity: android.app.Activity) { activity.startActivity(self) }
 
