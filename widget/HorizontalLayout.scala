@@ -5,10 +5,12 @@ import android.widget.LinearLayout.{LayoutParams => LLLP}
 import cyborg.Context._
 import cyborg.view.ViewGroupTrait
 import cyborg.view.LayoutParams._
+import android.view.ViewGroup.{LayoutParams => VGLP}
 
-class HorizontalLayout(implicit context: Context) extends LL(context) with ViewGroupTrait {
+class HorizontalLayout[LP <: VGLP](parentLayoutParams: LP = new LLLP(Fill, Fill))
+                                  (implicit context: Context) extends LL(context) with ViewGroupTrait {
   implicit def layout = this
-  implicit val layoutParams = new LLLP(Fill, Fill)
+  implicit val layoutParams = parentLayoutParams
   implicit def defaultLayoutParams = DefaultLayoutParams[LLLP](new LLLP(Wrap, Wrap))
 
   setOrientation(LL.HORIZONTAL)
