@@ -1,6 +1,8 @@
 package cyborg
 
 object util {
+  case class NotImplemented(message: String = "Not Implemented") extends Exception(message)
+
   object io {
     import java.io._
 
