@@ -29,7 +29,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
 
   // All entries
   private val allQuery = s"SELECT key, value FROM '$bucket'"
-  def all(): Seq[(String, String)] =
+  def all: Seq[(String, String)] =
     for (row <- sqlite(allQuery).toList)
       yield (row("key"), row("value"))
 
@@ -52,6 +52,19 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
       yield (row("key"), row("value"))
   }
 
+  class Binary {
+    // Select single blob value
+    def apply(key: String): Option[Array[Byte]] = sqlite(applyQuery, key).blob("value")
+
+    // Update a single blob value
+    def update(key: String, value: Array[Byte]) {
+      val contentValues = new ContentValues(2)
+      contentValues.put("key", key)
+      contentValues.put("value", value)
+      sqlite.replace(bucket, null, contentValues)
+    }
+  }
+  val binary = new Binary
 }
 
 object KeyValue {
@@ -65,7 +78,7 @@ object KeyValue {
         s"""
           | CREATE TABLE '$bucket' (
           |   key TEXT PRIMARY KEY NOT NULL,
-          |   val TEXT NOT NULL
+          |   value BLOB NOT NULL
           | );
         """.stripMargin)
     }

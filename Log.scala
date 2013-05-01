@@ -39,4 +39,16 @@ object Log {
   def java_$i(message: String, tag: String) { L.i(makeTag(Some(tag)), makeMessage(message)) }
   def java_$w(message: String, tag: String) { L.w(makeTag(Some(tag)), makeMessage(message)) }
   def java_$e(message: String, tag: String) { L.e(makeTag(Some(tag)), makeMessage(message)) }
+
+  implicit class WithLogMethods(string: String) {
+    def log$d(pre: => String = "", tag: Option[String] = None) { $d(pre + string, tag) }
+    def log$i(pre: => String = "", tag: Option[String] = None) { $i(pre + string, tag) }
+    def log$w(pre: => String = "", tag: Option[String] = None) { $w(pre + string, tag) }
+    def log$e(pre: => String = "", tag: Option[String] = None) { $e(pre + string, tag) }
+
+    def log$d(pre: => String, tag: String) { $d(pre + string, tag) }
+    def log$i(pre: => String, tag: String) { $i(pre + string, tag) }
+    def log$w(pre: => String, tag: String) { $w(pre + string, tag) }
+    def log$e(pre: => String, tag: String) { $e(pre + string, tag) }
+  }
 }

@@ -43,6 +43,13 @@ object util {
   object debug {
     import cyborg.Log._
 
+    implicit class Tapper[A](what: A) {
+      def tap(f: (A) => Any): A = {
+        f(what)
+        what
+      }
+    }
+
     def printStackTrace() {
       $d((new Throwable()).getStackTrace/*.drop(4)*/.mkString("\n>  "))
     }

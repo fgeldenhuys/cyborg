@@ -17,6 +17,14 @@ object SQLite {
       else None
     }
 
+    def blob(columnName: String): Option[Array[Byte]] = {
+      if (cursor.getCount > 0) {
+        if (cursor.isBeforeFirst) cursor.moveToFirst()
+        Some(cursor.getBlob(cursor.getColumnIndex(columnName)))
+      }
+      else None
+    }
+
     def isEmpty: Boolean = cursor.getCount == 0
 
     def toList: List[Map[String, String]] = {
