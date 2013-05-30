@@ -1,5 +1,7 @@
 package cyborg
 
+import android.os.Debug
+
 object util {
   case class NotImplemented(message: String = "Not Implemented") extends Exception(message)
 
@@ -43,15 +45,21 @@ object util {
   object debug {
     import cyborg.Log._
 
-    implicit class Tapper[A](what: A) {
+    /*implicit class Tapper[A](what: A) {
       def tap(f: (A) => Any): A = {
         f(what)
         what
       }
-    }
+    }*/
 
     def printStackTrace() {
       $d((new Throwable()).getStackTrace/*.drop(4)*/.mkString("\n>  "))
+    }
+
+    def printMemoryUsage() {
+      val meminfo = new Debug.MemoryInfo
+      Debug.getMemoryInfo(meminfo)
+      $d("Memory Usage: Pss=" + meminfo.getTotalPss + " Private=" + meminfo.getTotalPrivateDirty + " Shared=" + meminfo.getTotalSharedDirty())
     }
   }
 }

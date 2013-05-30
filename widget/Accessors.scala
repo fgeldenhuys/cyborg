@@ -1,6 +1,7 @@
 package cyborg.widget
 
 import cyborg.util.NotImplemented
+import android.view.View
 
 object Accessors {
   implicit class TextViewAccessors(val tv: android.widget.TextView) {
@@ -16,5 +17,7 @@ object Accessors {
     def text_=(text: CharSequence) { tv.setText(text) }
     def textSize = tv.getTextSize
     def textSize_=(s: Double) { tv.setTextSize(s.toFloat) }
+    def visible = tv.getVisibility == View.VISIBLE
+    def visible_=(v: Boolean) { tv.setVisibility(if(v) View.VISIBLE else View.INVISIBLE) }
   }
 }

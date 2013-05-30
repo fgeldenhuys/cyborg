@@ -12,7 +12,7 @@ object SQLite {
     def apply(columnName: String): Option[String] = {
       if (cursor.getCount > 0) {
         if (cursor.isBeforeFirst) cursor.moveToFirst()
-        Some(cursor.getString(cursor.getColumnIndex(columnName)))
+        Option(cursor.getString(cursor.getColumnIndex(columnName)))
       }
       else None
     }
@@ -29,7 +29,9 @@ object SQLite {
 
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)
-      toListHelper
+      val result = toListHelper
+      cursor.close()
+      result
     }
 
     private def cursor2map(cursor: AC): Map[String, String] =

@@ -25,4 +25,5 @@ class Activity extends android.app.Activity {
 
 object Activity {
   val ResultOk = android.app.Activity.RESULT_OK
+  val ResultCanceled = android.app.Activity.RESULT_CANCELED
 }
