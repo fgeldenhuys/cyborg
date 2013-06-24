@@ -8,7 +8,10 @@ object util {
 
   object numbers {
     object ValidInt {
-      def unapply(i: BigInt): Option[Int] = if(i.isValidInt) Some(i.toInt) else None
+      def unapply(i: BigInt): Option[Int] = if (i.isValidInt) Some(i.toInt) else None
+    }
+    object ValidLong {
+      def unapply(l: BigInt): Option[Long] = if (l.isValidLong) Some(l.toLong) else None
     }
   }
 
