@@ -36,7 +36,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   // Apply once-off filter for result
   private val selectQuery = s"SELECT key, value FROM '$bucket'"
   def select(filter: String => Boolean): List[(String, String)] =
-    for (row <- sqlite(selectQuery).toList if (filter(row("key"))))
+    for (row <- sqlite(selectQuery).toList if filter(row("key")))
       yield (row("key"), row("value"))
 
   // Glob for entries
@@ -48,7 +48,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   // Apply once-off filter for result on glob
   private val findAndSelectQuery = s"SELECT key, value FROM '$bucket' WHERE key GLOB ?"
   def findAndSelect(glob: String, filter: String => Boolean): List[(String, String)] = {
-    for (row <- sqlite(findAndSelectQuery, glob).toList if (filter(row("key"))))
+    for (row <- sqlite(findAndSelectQuery, glob).toList if filter(row("key")))
       yield (row("key"), row("value"))
   }
 
@@ -74,8 +74,8 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
 object KeyValue {
   val MaxWaitForLockMillis = 1000
 
-  class DbOpenHelper(val bucket: String)(implicit context: Context)
-    extends SQLiteOpenHelper(context, "CyborgKeyValueDb", null, 1) {
+  class DbOpenHelper(val bucket: String, version: Int = 1)(implicit context: Context)
+    extends SQLiteOpenHelper(context, "CyborgKeyValueDb", null, version) {
 
     def onCreate(db: SQLiteDatabase) {
       db.execSQL(
