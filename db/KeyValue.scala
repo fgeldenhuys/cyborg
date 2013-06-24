@@ -63,6 +63,10 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
       contentValues.put("value", value)
       sqlite.replace(bucket, null, contentValues)
     }
+
+    def find(glob: String): Seq[(String, Array[Byte])] =
+      for (row <- sqlite(findQuery, glob).toBlobList)
+        yield (row("key").left.get, row("value").right.get)
   }
   val binary = new Binary
 }

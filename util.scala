@@ -4,6 +4,13 @@ import android.os.Debug
 
 object util {
   case class NotImplemented(message: String = "Not Implemented") extends Exception(message)
+  case class InvalidConversion(message: String = "Invalid Conversion") extends Exception(message)
+
+  object numbers {
+    object ValidInt {
+      def unapply(i: BigInt): Option[Int] = if(i.isValidInt) Some(i.toInt) else None
+    }
+  }
 
   object io {
     import java.io._
