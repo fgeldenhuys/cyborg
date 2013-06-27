@@ -74,10 +74,12 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
 object KeyValue {
   val MaxWaitForLockMillis = 1000
 
+  //TODO: create bucket table if it doesn't exist, and remove version parameter
   class DbOpenHelper(val bucket: String, version: Int = 1)(implicit context: Context)
     extends SQLiteOpenHelper(context, "CyborgKeyValueDb", null, version) {
 
     def onCreate(db: SQLiteDatabase) {
+      $d(s"create table $bucket")
       db.execSQL(
         s"""
           | CREATE TABLE '$bucket' (

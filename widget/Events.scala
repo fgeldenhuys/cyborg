@@ -11,10 +11,10 @@ object Events {
     })}
   }
   implicit class TextViewEvents(val textView: android.widget.TextView) {
-    def onTextChanged(f: => Unit) { textView.addTextChangedListener(new TextWatcher {
-      val textChangedFun = () => f
+    def onTextChanged(f: (CharSequence) => Unit) { textView.addTextChangedListener(new TextWatcher {
+      val textChangedFun = (text: CharSequence) => f(text)
       def beforeTextChanged(p1: CharSequence, p2: Int, p3: Int, p4: Int) {}
-      def onTextChanged(p1: CharSequence, p2: Int, p3: Int, p4: Int) { textChangedFun() }
+      def onTextChanged(text: CharSequence, p2: Int, p3: Int, p4: Int) { textChangedFun(text) }
       def afterTextChanged(p1: Editable) {}
     })}
   }
