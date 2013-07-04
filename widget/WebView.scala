@@ -5,13 +5,12 @@ import cyborg.Context.Context
 import cyborg.Log
 import cyborg.util.execution._
 import cyborg.util.io._
-import cyborg.net.URLExt._
+import cyborg.net.URIExt._
 import android.os.SystemClock
 import java.io.{IOException, ByteArrayOutputStream}
 import java.net.URLDecoder
 import android.webkit.{ConsoleMessage, MimeTypeMap}
 import android.webkit
-import za.co.wmgc.AugmentedWebView
 
 class WebView(implicit val context: Context) extends android.webkit.WebView(context) with Log {
   var chromeClient: Option[WebChromeClient] = None
@@ -36,7 +35,7 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
       $e(s"Exception during runJS: $ex")
       ex.printStackTrace()
     } apply {
-      val script = s"javascript:(function(){$js;})()";
+      val script = s"javascript:(function(){$js;})()"
       for (cc <- chromeClient) {
         cc.lastRunJS = Some(script)
         cc.lastRunTime = Some(SystemClock.uptimeMillis())
@@ -70,10 +69,9 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
   }
 
   def url = getUrl
-  def urlFile: Option[String] = for (URLFile(file) <- URL(getUrl)) yield URLDecoder.decode(file, "UTF-8")
-  def urlPath: Option[String] = for (URLPath(path) <- URL(getUrl)) yield URLDecoder.decode(path, "UTF-8")
-  def urlQuery: Option[String] = for (URLRef(query) <- URL(getUrl)) yield URLDecoder.decode(query, "UTF-8")
-  def urlRef: Option[String] = for (URLRef(ref) <- URL(getUrl)) yield URLDecoder.decode(ref, "UTF-8")
+  def urlPath: Option[String] = for (URIPath(path) <- URI(getUrl)) yield URLDecoder.decode(path, "UTF-8")
+  def urlQuery: Option[String] = for (URIQuery(query) <- URI(getUrl)) yield URLDecoder.decode(query, "UTF-8")
+  def urlFragment: Option[String] = for (URIFragment(ref) <- URI(getUrl)) yield URLDecoder.decode(ref, "UTF-8")
   def urlDecoded: String = URLDecoder.decode(url, "UTF-8")
 
   def mimeType: Option[String] = {
