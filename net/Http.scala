@@ -1,9 +1,7 @@
 package cyborg.net
 
 import cyborg.net.Http._
-import cyborg.net.Http.HttpParameters
-import cyborg.net.Http.SimpleHttpResult
-import java.io.{BufferedOutputStream, IOException, FileNotFoundException, InputStream}
+import java.io._
 import java.net.{CookieHandler, CookieManager, HttpURLConnection}
 import javax.net.ssl.SSLSocketFactory
 import org.apache.http.client.entity.UrlEncodedFormEntity
@@ -13,18 +11,25 @@ import scala.collection.JavaConversions._
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import cyborg.net.Http.HttpParameters
+import cyborg.net.Http.SimpleHttpResult
+import scala.Some
+import cyborg.util.io._
+import cyborg.util.binary._
 
 trait Http {
   import cyborg.Log._
 
   protected def createConnection(url: String)(implicit params: HttpParameters): HttpURLConnection
 
-  def get(url: String, data: Map[String, String] = Map.empty)
+  def get(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
-    $d(s"get url=$url")
     val http = createConnection(url + "?" + makeGetParams(data))
     try {
-      val content = read(http.getInputStream)
+      val inputStream = http.getInputStream
+      val content =
+        if (progress.isDefined) readWithProgress(inputStream)(progress.get)
+        else read(inputStream)
       val code = http.getResponseCode
       http.disconnect()
       SimpleHttpResult(code, content)
@@ -32,10 +37,14 @@ trait Http {
     catch {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.get] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.get] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
     }
   }
 
@@ -58,10 +67,14 @@ trait Http {
     catch {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.post] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.post] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
     }
   }
 
@@ -77,10 +90,14 @@ trait Http {
     catch {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.delete] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.delete] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
     }
   }
 
@@ -104,10 +121,14 @@ trait Http {
     catch {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.getFile] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
-        SimpleHttpResult(http.getResponseCode, errorContent)
+        val responseCode = http.getResponseCode
+        $w(s"[Http.getFile] $responseCode $e")
+        SimpleHttpResult(responseCode, errorContent)
     }
   }
 
@@ -130,8 +151,10 @@ object Http {
 
     protected def createConnection(url: String)(implicit params: HttpParameters): HttpURLConnection =
       http.createConnection(addHost(url))
-    override def get(url: String, data: Map[String, String])(implicit params: HttpParameters): Future[HttpResult] =
-      http.get(addHost(url), data)(params)
+    override def get(url: String, data: Map[String, String])
+                    (progress: Option[(Bytes) => Any])
+                    (implicit params: HttpParameters): Future[HttpResult] =
+      http.get(addHost(url), data)(progress)(params)
     override def post(url: String, data: Map[String, String])(implicit params: HttpParameters): Future[HttpResult] =
       http.post(addHost(url), data)(params)
     override def getFile(url: String, outputFile: String, data: Map[String, String])
@@ -176,6 +199,12 @@ object Http {
 
   def read(in: InputStream) = Option(in) map { (in) =>
     new String(Stream.continually(in.read).takeWhile(_ != -1).map(_.toByte).toArray)
+  } getOrElse ("")
+
+  def readWithProgress(in: InputStream)(f: (Bytes) => Any) = Option(in) map { in =>
+    val result = new ByteArrayOutputStream()
+    inStream2outStreamWithProgress(in, result)(f)
+    result.toString("UTF-8")
   } getOrElse ("")
 
   def makeGetParams(params: Map[String, String]): String =

@@ -1,8 +1,11 @@
 package cyborg
 
 object Context {
-  //implicit class Context(val context: android.content.Context) extends AnyVal {}
-  class Context(val context: android.content.Context)
   implicit def android2cyborgContext(context: android.content.Context) = new Context(context)
-  implicit def cyborg2androidContext(context: Context) = context.context
+  implicit def cyborg2androidContext(context: Context) = context.c
+  val UsbService = android.content.Context.USB_SERVICE
+}
+
+class Context(val c: android.content.Context) extends AnyVal {
+  def systemService[A](name: String): A = c.getSystemService(name).asInstanceOf[A]
 }

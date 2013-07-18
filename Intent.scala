@@ -1,7 +1,5 @@
 package cyborg
 
-import cyborg.Context._
-
 class Intent(val self: android.content.Intent) /*extends AnyVal*/ {
   def start(implicit activity: Activity) { activity.startActivity(self) }
   def start(activity: android.app.Activity) { activity.startActivity(self) }
@@ -15,6 +13,9 @@ class Intent(val self: android.content.Intent) /*extends AnyVal*/ {
 
   def update(name: String, value: String) = self.putExtra(name, value)
   def update(name: String, value: Int) = self.putExtra(name, value)
+
+  def extras = Option(self.getExtras)
+  def stringExtra(name: String) = Option(self.getStringExtra(name))
 }
 
 object Intent {

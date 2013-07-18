@@ -2,7 +2,7 @@ package cyborg.widget
 
 import android.widget.{LinearLayout => LL}
 import android.widget.LinearLayout.{LayoutParams => LLLP}
-import cyborg.Context._
+import cyborg.Context
 import cyborg.view.ViewGroupTrait
 import cyborg.view.LayoutParams._
 import android.view.ViewGroup.{LayoutParams => VGLP}

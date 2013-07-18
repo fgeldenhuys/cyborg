@@ -3,7 +3,7 @@ package cyborg.net
 import java.net.URL
 import javax.net.ssl.{HttpsURLConnection, SSLContext, TrustManagerFactory, SSLSocketFactory}
 import java.security.KeyStore
-import cyborg.Context.Context
+import cyborg.Context
 import org.apache.http.conn.ssl.AllowAllHostnameVerifier
 
 object HttpSecure extends Http {

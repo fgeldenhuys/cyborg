@@ -1,6 +1,6 @@
 package cyborg.db
 
-import cyborg.Context.Context
+import cyborg.Context
 import cyborg.db.SQLite._
 import android.database.sqlite.{SQLiteDatabaseLockedException, SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.Log._
@@ -78,15 +78,17 @@ object KeyValue {
   class DbOpenHelper(val bucket: String, version: Int = 1)(implicit context: Context)
     extends SQLiteOpenHelper(context, "CyborgKeyValueDb", null, version) {
 
-    def onCreate(db: SQLiteDatabase) {
-      $d(s"create table $bucket")
+    override def onOpen(db: SQLiteDatabase) {
       db.execSQL(
         s"""
-          | CREATE TABLE '$bucket' (
+          | CREATE TABLE IF NOT EXISTS '$bucket' (
           |   key TEXT PRIMARY KEY NOT NULL,
           |   value BLOB NOT NULL
           | );
         """.stripMargin)
+    }
+
+    def onCreate(db: SQLiteDatabase) {
     }
 
     def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {

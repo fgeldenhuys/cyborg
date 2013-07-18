@@ -4,7 +4,7 @@ import cyborg.util.NotImplemented
 import android.view.View
 
 object Accessors {
-  implicit class TextViewAccessors(val tv: android.widget.TextView) {
+  implicit class TextViewAccessors(val tv: android.widget.TextView) extends AnyVal {
     def backgroundColour: Int = { throw NotImplemented() }
     def backgroundColour_=(c: Int) { tv.setBackgroundColor(c)}
     def colour: Int = tv.getCurrentTextColor
@@ -19,5 +19,12 @@ object Accessors {
     def textSize_=(s: Double) { tv.setTextSize(s.toFloat) }
     def visible = tv.getVisibility == View.VISIBLE
     def visible_=(v: Boolean) { tv.setVisibility(if(v) View.VISIBLE else View.INVISIBLE) }
+  }
+
+  implicit class ProgressBarAccessors(val pb: android.widget.ProgressBar) extends AnyVal {
+    def max: Int = pb.getMax
+    def max_=(m: Int) { pb.setMax(m) }
+    def progress: Int = pb.getProgress
+    def progress_=(p: Int) { pb.setProgress(p) }
   }
 }

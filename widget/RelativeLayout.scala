@@ -3,7 +3,7 @@ package cyborg.widget
 import android.widget.RelativeLayout.{LayoutParams => RLLP}
 import cyborg.view.{LayoutParams, ViewGroupTrait}
 import LayoutParams._
-import cyborg.Context._
+import cyborg.Context
 import cyborg.Units.Ltrb
 
 class RelativeLayout(implicit context: Context)

@@ -2,7 +2,7 @@ package cyborg.widget
 
 import android.widget.{FrameLayout => FL}
 import android.widget.FrameLayout.{LayoutParams => FLLP}
-import cyborg.Context._
+import cyborg.Context
 import cyborg.view.ViewGroupTrait
 import cyborg.view.LayoutParams._
 

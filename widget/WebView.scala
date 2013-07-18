@@ -1,7 +1,7 @@
 package cyborg.widget
 
 import scala.util.control.Exception._
-import cyborg.Context.Context
+import cyborg.Context
 import cyborg.Log
 import cyborg.util.execution._
 import cyborg.util.io._
@@ -11,6 +11,7 @@ import java.io.{IOException, ByteArrayOutputStream}
 import java.net.URLDecoder
 import android.webkit.{ConsoleMessage, MimeTypeMap}
 import android.webkit
+import scala.collection.JavaConversions._
 
 class WebView(implicit val context: Context) extends android.webkit.WebView(context) with Log {
   var chromeClient: Option[WebChromeClient] = None
@@ -27,6 +28,12 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
   def safeLoadUrl(url: String) {
     webViewBitchHandler {
       loadUrl(url)
+    }
+  }
+
+  def safeLoadUrl(url: String, httpHeaders: Map[String, String]) {
+    webViewBitchHandler {
+      loadUrl(url, httpHeaders)
     }
   }
 
@@ -86,8 +93,20 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
 object WebView {
   def escapeJSString(str: String): String = {
     if (str == null) return "null"
-    else return "\"" + str.replace("\"", "\\\"").replace("\n", "\\n") + "\""
+    else return "\"" + str.replace("\\","\\\\")
+                          .replace("\n","\\n")
+                          .replace("\b","\\b")
+                          .replace("\r","\\r")
+                          .replace("\t","\\t")
+                          .replace("\'","\\'")
+                          .replace("\f","\\f")
+                          .replace("\"","\\\"") + "\""
   }
+
+  val NoCacheHeaders = Map(
+    "Pragma" -> "no-cache",
+    "Cache-Control" -> "no-cache"
+  )
 }
 
 class WebViewClient extends android.webkit.WebViewClient {
@@ -115,7 +134,7 @@ class WebChromeClient extends android.webkit.WebChromeClient with Log {
     val source = if(message.sourceId() == null)
       "UNKNOWN"
     else if (message.sourceId contains ":/")
-      URLDecoder.decode(AugmentedWebView.strip(message.sourceId))
+      URLDecoder.decode(message.sourceId)
     else
       message.sourceId
     message.messageLevel match {
