@@ -4,6 +4,17 @@ import cyborg.util.NotImplemented
 import android.view.View
 
 object Accessors {
+  implicit class ButtonAccessors(val b: android.widget.Button) extends AnyVal {
+    def focus() { b.setFocusableInTouchMode(true); b.requestFocus() }
+  }
+
+  implicit class ProgressBarAccessors(val pb: android.widget.ProgressBar) extends AnyVal {
+    def max: Int = pb.getMax
+    def max_=(m: Int) { pb.setMax(m) }
+    def progress: Int = pb.getProgress
+    def progress_=(p: Int) { pb.setProgress(p) }
+  }
+
   implicit class TextViewAccessors(val tv: android.widget.TextView) extends AnyVal {
     def backgroundColour: Int = { throw NotImplemented() }
     def backgroundColour_=(c: Int) { tv.setBackgroundColor(c)}
@@ -19,12 +30,5 @@ object Accessors {
     def textSize_=(s: Double) { tv.setTextSize(s.toFloat) }
     def visible = tv.getVisibility == View.VISIBLE
     def visible_=(v: Boolean) { tv.setVisibility(if(v) View.VISIBLE else View.INVISIBLE) }
-  }
-
-  implicit class ProgressBarAccessors(val pb: android.widget.ProgressBar) extends AnyVal {
-    def max: Int = pb.getMax
-    def max_=(m: Int) { pb.setMax(m) }
-    def progress: Int = pb.getProgress
-    def progress_=(p: Int) { pb.setProgress(p) }
   }
 }
