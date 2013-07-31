@@ -42,7 +42,7 @@ object SQLite {
     }
   }
 
-  implicit class Cursor(val cursor: AC) extends AnyVal {
+  implicit class CursorExt(val cursor: AC) extends AnyVal {
     def apply(columnName: String): Option[String] = {
       if (cursor.getCount > 0) {
         if (cursor.isBeforeFirst) cursor.moveToFirst()

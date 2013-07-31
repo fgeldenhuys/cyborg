@@ -18,7 +18,12 @@ object binary {
       else if (bytes < TiB) f"${bytes.toFloat / GiB.toFloat}%.3f GiB"
       else f"${bytes.toFloat / TiB.toFloat}%.3f TiB"
     }
+
+    def toInt = bytes
+    def toDouble = bytes.toDouble
   }
+
+  implicit def bytes2int(b: Bytes): Int = b.toInt
 
   implicit class ByteArrayExt(val data: Array[Byte]) extends AnyVal {
     def hexString = data.map("%02X" format _).mkString(" ")

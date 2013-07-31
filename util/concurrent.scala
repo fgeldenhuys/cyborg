@@ -10,4 +10,13 @@ object concurrent {
     } catch {
       case e: TimeoutException => None
     }
+
+  def sleep(duration: Duration) {
+    try {
+      Thread.sleep(duration.toMillis)
+    }
+    catch {
+      case e: InterruptedException => {}
+    }
+  }
 }

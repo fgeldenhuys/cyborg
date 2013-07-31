@@ -1,5 +1,8 @@
 package cyborg.util
 
+import scala.util.control.Exception._
+import scala.Some
+
 object control {
   implicit class OptionExt[A](val x: Option[A]) extends AnyVal {
     def failWith(f: => Any): Option[A] = {
@@ -11,5 +14,10 @@ object control {
   def OptionWithFail[A](x: A)(f: => Any): Option[A] = {
     if (x == null) { f; None }
     else Some(x)
+  }
+
+  def stackTraceHandler[T](failed: T) = handling(classOf[Exception]) by { ex =>
+    ex.printStackTrace()
+    failed
   }
 }

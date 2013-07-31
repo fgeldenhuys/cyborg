@@ -10,6 +10,7 @@ object Preferences {
     def delete[T](key: String)(implicit prop: Prop[T], context: Context) {
       prop.del(section, key)
     }
+    def raw(implicit context: Context) = context.getSharedPreferences(section, 0)
     def java(implicit context: android.content.Context): JavaPreferences =
       new JavaPreferences(context, section)
   }
