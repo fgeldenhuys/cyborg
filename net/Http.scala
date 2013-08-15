@@ -24,7 +24,9 @@ trait Http {
 
   def get(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
-    val http = createConnection(url + "?" + makeGetParams(data))
+    val fullUrl = url + "?" + makeGetParams(data)
+    $d(s"[Http.get] GET '$fullUrl'")
+    val http = createConnection(fullUrl)
     try {
       val inputStream = http.getInputStream
       val content =
@@ -38,18 +40,19 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.get] $responseCode $e")
+        $w(s"[Http.get] $responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.get] $responseCode $e")
+        $w(s"[Http.get] $responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }
 
   def post(url: String, data: Map[String, String] = Map.empty)
           (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
+    $d(s"[Http.post] POST '$url' $data")
     val http = createConnection(url)(params.copy(chunked = false))
     try {
       http.setRequestMethod("POST")
@@ -68,17 +71,18 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.post] $responseCode $e")
+        $w(s"[Http.post] $responseCode $e for '$url'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.post] $responseCode $e")
+        $w(s"[Http.post] $responseCode $e for '$url'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }
 
   def delete(url: String)(implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
+    $d(s"[Http.delete] DELETE '$url'")
     val http = createConnection(url)
     try {
       http.setRequestMethod("DELETE")
@@ -91,12 +95,12 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.delete] $responseCode $e")
+        $w(s"[Http.delete] $responseCode $e for '$url'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.delete] $responseCode $e")
+        $w(s"[Http.delete] $responseCode $e for '$url'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }
@@ -104,7 +108,9 @@ trait Http {
   def getFile(url: String, outputFile: String, data: Map[String, String] = Map.empty)
          (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
     import cyborg.util.io._
-    val http = createConnection(url + "?" + makeGetParams(data))
+    val fullUrl = url + "?" + makeGetParams(data)
+    $d(s"[Http.getFile] GET '$fullUrl'")
+    val http = createConnection(fullUrl)
     try {
       val in = http.getInputStream
       val code = http.getResponseCode
@@ -112,7 +118,8 @@ trait Http {
         val file = new java.io.File(outputFile)
         file.getCanonicalFile.getParentFile.mkdirs()
         file.createNewFile()
-        inStream2NewFile(in, file)
+        val size = inStream2NewFile(in, file)
+        $d(s"[Http.getFile] Downloaded '${file.getAbsolutePath}' of size $size")
         file.getAbsolutePath
       } else read(http.getErrorStream)
       http.disconnect()
@@ -122,12 +129,12 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.getFile] $responseCode $e")
+        $w(s"[Http.getFile] $responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.getFile] $responseCode $e")
+        $w(s"[Http.getFile] $responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }

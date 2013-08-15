@@ -84,6 +84,13 @@ object SQLite {
       result
     }
 
+    def toList(field: String): List[String] = {
+      cursor.moveToPosition(-1)
+      val result = toListHelper(field)
+      cursor.close()
+      result
+    }
+
     def toBlobList: List[Map[String, StringOrBlob]] = {
       cursor.moveToPosition(-1)
       val result = toBlobListHelper
@@ -111,6 +118,14 @@ object SQLite {
 
       if (cursor.isAfterLast) Nil
       else cursor2map(cursor) :: toListHelper
+    }
+
+    private def toListHelper(field: String): List[String] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+
+      if (cursor.isAfterLast) Nil
+      else cursor.getString(cursor.getColumnIndex(field)) +: toListHelper(field)
     }
 
     private def toBlobListHelper: List[Map[String, StringOrBlob]] = {

@@ -69,6 +69,29 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
         yield (row("key").left.get, row("value").right.get)
   }
   val binary = new Binary
+
+  class StringIndex {
+    val stringIndexStringQuery = s"SELECT stringindex FROM '$bucket' WHERE key = ?"
+    def string(key: String): Option[String] =
+      sqlite(stringIndexStringQuery, key)("stringindex")
+
+    val stringIndexKeysQuery = s"SELECT key FROM '$bucket' WHERE stringindex LIKE ?"
+    def keys(find: String): List[String] =
+      sqlite(stringIndexKeysQuery, s"%$find%").toList("key")
+
+    val stringIndexQuery = s"SELECT value FROM '$bucket' WHERE stringindex LIKE ?"
+    def apply(find: String): List[String] =
+      sqlite(stringIndexQuery, s"%$find%").toList("value")
+
+
+    def update(key: String, string: String) {
+      val contentValues = new ContentValues(2)
+      contentValues.put("key", key)
+      contentValues.put("stringindex", string)
+      sqlite.replace(bucket, null, contentValues)
+    }
+  }
+  val stringIndex = new StringIndex
 }
 
 object KeyValue {
@@ -83,6 +106,7 @@ object KeyValue {
         s"""
           | CREATE TABLE IF NOT EXISTS '$bucket' (
           |   key TEXT PRIMARY KEY NOT NULL,
+          |   stringindex TEXT DEFAULT NULL,
           |   value BLOB NOT NULL
           | );
         """.stripMargin)

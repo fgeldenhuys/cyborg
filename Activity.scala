@@ -3,6 +3,7 @@ package cyborg
 import Context._
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -28,6 +29,10 @@ class Activity extends android.app.Activity {
       .asInstanceOf[InputMethodManager]
     inputManager.hideSoftInputFromWindow(getCurrentFocus.getWindowToken,
       InputMethodManager.HIDE_NOT_ALWAYS)
+  }
+
+  def toast(message: String) {
+    runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
   }
 }
 

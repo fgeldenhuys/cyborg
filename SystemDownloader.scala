@@ -1,30 +1,35 @@
 package cyborg
 
 import android.app.{DownloadManager => DM}
+import android.content.{IntentFilter, BroadcastReceiver}
 import android.database.Cursor
 import android.net.Uri
 import android.os.{ParcelFileDescriptor, Environment}
 import cyborg.db.SQLite._
 import cyborg.Preferences._
 import cyborg.util.binary._
+import cyborg.util.concurrent._
 import cyborg.util.control._
 import cyborg.util.io._
 import java.io.File
 import java.util.UUID
 import scala.collection.mutable
-import android.content.{IntentFilter, Intent, BroadcastReceiver}
+import scala.concurrent.duration._
 
-class SystemDownloader()(implicit context: Context) {
+class SystemDownloader(val onSuccess: () => Any)(implicit context: Context) {
   import SystemDownloader._
   import cyborg.Log._
+
+  //def this()(implicit context: Context) = this(() => {})(context)
 
   implicit val downloadManager = context.systemService[DM](Context.DownloadService)
   val store = new Preferences("cyborg.SystemDownloader")
   val queued = mutable.Queue.empty[Download]
 
   val onDownloadComplete = new BroadcastReceiver {
-    def onReceive(androidContext: android.content.Context, intent: Intent) {
+    def onReceive(androidContext: android.content.Context, intent: android.content.Intent) {
       $d("A download has completed")
+      $d("Downloads:\n" + downloads.mkString("\n"))
       checkFailed
       checkSuccessful
       bump
@@ -39,8 +44,12 @@ class SystemDownloader()(implicit context: Context) {
     context.unregisterReceiver(onDownloadComplete)
   }
 
-  def enqueue(uri: Uri, title: String, description: String): Boolean = {
-    val download = Download(title = title, uri = Some(uri), description = Some(description))
+  def enqueue(uri: Uri, title: String, description: String, filename: String): Boolean = {
+    val download = Download(
+      title = title,
+      uri = Some(uri),
+      description = Some(description),
+      filename = Some(filename))
     if (!queued.exists(_.uri.exists(_.compareTo(uri) == 0)) && // uri not already queued
         !uncompletedDownloads.exists(_.uri.exists(_.compareTo(uri) == 0))) { // not already processed
       queued.enqueue(download)
@@ -66,6 +75,7 @@ class SystemDownloader()(implicit context: Context) {
           .setTitle(download.title)
         download.description map (request setDescription _)
         val id = downloadManager.enqueue(request)
+        sleep(50 milliseconds)
         download.copy(id = Some(id), tmpFile = Some(downloadsDir + "/" + tmpName)).sync.saveTo(store)
       }
     }
@@ -85,21 +95,24 @@ class SystemDownloader()(implicit context: Context) {
 
   def checkSuccessful: Seq[Download] = {
     for (download <- successfulDownloads; id <- download.id) yield {
-      val tmpFile = downloadManager.openDownloadedFile(id)
-      download.filename match {
-        case Some(target) =>
-          $d(s"Copy successful download '${download.title}' to '$target'")
-          stackTraceHandler(Nil) {
+      stackTraceHandler(Nil) {
+        $d(s"downloadManager.openDownloadedFile($id)")
+        val tmpFile = downloadManager.openDownloadedFile(id)
+        download.filename match {
+          case Some(target) =>
+            $d(s"Copy successful download '${download.title}' to '$target'")
             val in = new ParcelFileDescriptor.AutoCloseInputStream(tmpFile)
             val targetFile = new File(target)
             targetFile.getParentFile.mkdirs()
             inStream2NewFile(in, targetFile)
             in.close()
-          }
-        case None =>
-          $w(s"No filename specified for '${download.title}'")
+            onSuccess()
+          case None =>
+            $w(s"No filename specified for '${download.title}'")
+        }
       }
       download.removeFrom(store)
+      download.id map (downloadManager remove _)
       download
     }
   }
@@ -129,9 +142,18 @@ class SystemDownloader()(implicit context: Context) {
   def completedDownloads: Seq[Download] = downloads.filter { d =>
     d.isFailed || d.isSuccessful
   }
+
+  def cancelAll() {
+    queued.clear()
+    for (d <- downloads; id <- d.id) {
+      downloadManager remove id
+    }
+  }
 }
 
 object SystemDownloader {
+  import Log._
+
   val StatusRunning = DM.STATUS_RUNNING
   val StatusFailed = DM.STATUS_FAILED
   val StatusPaused = DM.STATUS_PAUSED
@@ -150,13 +172,20 @@ object SystemDownloader {
     size: Option[Bytes] = None,
     downloaded: Option[Bytes] = None
   ) {
+    override def toString = s"Download($id '$title' $statusString [$uri])"
+
     def sync(implicit downloadManager: DM): Download = {
       for (cursor <- Option(downloadManager.query(new DM.Query))) {
         while(!cursor.isAfterLast) {
           for (check <- cursor2download(cursor)) {
             if (this.id == check.id) {
               cursor.close()
-              return check
+              return copy(
+                status = check.status,
+                title = check.title,
+                description = check.description,
+                size = check.size,
+                downloaded = check.downloaded)
             }
           }
           cursor.moveToNext()
@@ -172,6 +201,8 @@ object SystemDownloader {
       case StatusPaused => "paused"
       case StatusSuccessful => "successful"
       case StatusFailed => "failed"
+      case StatusQueued => "queued"
+      case _ => "unknown"
     }
 
     def progress: Option[Double] =
@@ -188,6 +219,7 @@ object SystemDownloader {
         val pre = s"dl-$id-"
         val edit = p.raw.edit()
         edit.putString(pre + "uri", uri.toString)
+        $d("SAVING DOWNLOAD INFO: " + pre + "uri -> " + uri.toString)
         filename.map(edit.putString(pre + "filename", _))
         tmpFile.map(edit.putString(pre + "tmpfile", _))
         description.map(edit.putString(pre + "description", _))

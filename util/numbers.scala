@@ -18,6 +18,15 @@ object numbers {
     implicit def int2double(i: Int) = i.toDouble
   }
 
+  object StringConversionsWithDefaults {
+    import scala.util.control.Exception._
+    val numberFormatExceptionHandler = catching(classOf[NumberFormatException])
+
+    implicit class StringConversionsWithDefaults(val string: String) extends AnyVal {
+      def toIntElse(d: Int) = numberFormatExceptionHandler.opt(string.toInt).getOrElse(d)
+    }
+  }
+
   private val WhitespaceRegex = "\\s".r
   implicit class HexStringContext(val sc: StringContext) extends AnyVal {
     def hex(args: Any*): Int = {
@@ -28,7 +37,7 @@ object numbers {
         buffer append expressions.next
         buffer append strings.next
       }
-      java.lang.Long.parseLong(WhitespaceRegex replaceAllIn (buffer.toString, _ => ""), 16).toInt
+      java.lang.Long.parseLong(WhitespaceRegex replaceAllIn (buffer.toString, ""), 16).toInt
     }
   }
 }

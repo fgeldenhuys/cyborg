@@ -34,8 +34,26 @@ object binary {
     def hexString = data.array().map("%02X" format _).mkString(" ")
     def << (byte: Byte): ByteBuffer = data.put(byte)
     def << (int: Int): ByteBuffer = data.putInt(int)
+    def << (short: Short): ByteBuffer = data.putShort(short)
     def << (a: Array[Byte]): ByteBuffer = data.put(a)
     def << (string: String): ByteBuffer = data.put(string.getBytes("UTF-8"))
     def pad(byte: Byte): ByteBuffer = data.put(Array.fill[Byte](data.remaining())(byte))
+  }
+
+  case class InvalidHexString(message: String) extends Exception(message)
+  private val spacesRegex = """\s+""".r
+  private val hexCharsRegex = """[0-9A-F]+""".r
+  implicit class HexStringExt(val string: String) extends AnyVal {
+    def hexToByteArray(minSize: Int = 0): Array[Byte] = {
+      val preprocess = spacesRegex replaceAllIn (string, "") toUpperCase()
+      if (preprocess.isEmpty)
+        Array.fill(minSize)(0.toByte)
+      else {
+        if (hexCharsRegex unapplySeq preprocess isEmpty)
+          throw InvalidHexString(s"'$preprocess' is not a hex string")
+        (for (byte <- preprocess.grouped(2)) yield
+          Integer.parseInt(byte, 16).toByte).toArray.reverse.padTo(minSize, 0.toByte).reverse
+      }
+    }
   }
 }
