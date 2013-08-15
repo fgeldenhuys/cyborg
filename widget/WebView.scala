@@ -1,17 +1,17 @@
 package cyborg.widget
 
-import scala.util.control.Exception._
+import android.os.SystemClock
+import android.webkit
+import android.webkit.{ConsoleMessage, MimeTypeMap}
 import cyborg.Context
 import cyborg.Log
+import cyborg.net.URIExt._
 import cyborg.util.execution._
 import cyborg.util.io._
-import cyborg.net.URIExt._
-import android.os.SystemClock
 import java.io.{IOException, ByteArrayOutputStream}
 import java.net.URLDecoder
-import android.webkit.{ConsoleMessage, MimeTypeMap}
-import android.webkit
 import scala.collection.JavaConversions._
+import scala.util.control.Exception._
 
 class WebView(implicit val context: Context) extends android.webkit.WebView(context) with Log {
   var chromeClient: Option[WebChromeClient] = None
@@ -64,10 +64,16 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
     catching(classOf[IOException]).opt {
       val in = getContext.getAssets.open(filename)
       val buffer = new ByteArrayOutputStream()
-      buffer << "javascript:(function(){"
-      buffer << in
-      buffer << ";})()"
-      buffer.toString("UTF-8")
+      buffer << "javascript:"
+      val bytes = inStream2outStream(in, buffer)
+      //$d(s"Loaded $bytes bytes from '$filename'")
+      val string = buffer.toString("UTF-8")
+      //$d(s"Converted to string of ${string.size} characters:")
+      for (cc <- chromeClient) {
+        cc.lastRunJS = Some(string)
+        cc.lastRunTime = Some(SystemClock.uptimeMillis())
+      }
+      string
     } map safeLoadUrl
   }
 
@@ -142,11 +148,14 @@ class WebChromeClient extends android.webkit.WebChromeClient with Log {
       case ConsoleMessage.MessageLevel.WARNING => $w(source + ":" + message.lineNumber() + ": " + message.message())
       case _ => $d(source + ":" + message.lineNumber() + ": " + message.message())
     }
-    for (js <- lastRunJS; time <- lastRunTime) {
-      if (message.sourceId() == null &&
-        message.lineNumber() <= js.lines.size &&
-        math.abs(SystemClock.uptimeMillis() - time) < 1000) {
-        $d("Possibly for this code:\n" + lastRunJS)
+    if (message.messageLevel == ConsoleMessage.MessageLevel.ERROR ||
+      message.messageLevel == ConsoleMessage.MessageLevel.WARNING) {
+      for (js <- lastRunJS; time <- lastRunTime) {
+        if (message.sourceId() == null &&
+          message.lineNumber() <= js.lines.size &&
+          math.abs(SystemClock.uptimeMillis() - time) < 1000) {
+          $d("Possibly for this code:\n" + lastRunJS)
+        }
       }
     }
     true
