@@ -13,16 +13,15 @@ import java.net.URLDecoder
 import scala.collection.JavaConversions._
 import scala.util.control.Exception._
 
-class WebView(implicit val context: Context) extends android.webkit.WebView(context) with Log {
-  var chromeClient: Option[WebChromeClient] = None
+class WebView()(implicit val context: Context) extends android.webkit.WebView(context) with Log {
+  val chromeClient: WebChromeClient = new WebChromeClient
 
   val webViewBitchHandler = handling(classOf[NullPointerException]) by { (ex) =>
     $d("WebView is being a little bitch again")
   }
 
   def setWebChromeClient(client: WebChromeClient) {
-    super.setWebChromeClient(client)
-    chromeClient = Option(client)
+    throw new UnsupportedOperationException("The chrome client cannot be changed")
   }
 
   def safeLoadUrl(url: String) {
@@ -42,11 +41,9 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
       $e(s"Exception during runJS: $ex")
       ex.printStackTrace()
     } apply {
-      val script = s"javascript:(function(){$js;})()"
-      for (cc <- chromeClient) {
-        cc.lastRunJS = Some(script)
-        cc.lastRunTime = Some(SystemClock.uptimeMillis())
-      }
+      val script = s"javascript:(function(){$js;}())"
+      chromeClient.lastRunJS = Some(js)
+      chromeClient.lastRunTime = Some(SystemClock.uptimeMillis())
       webViewBitchHandler {
         runOnMainLooper {
           safeLoadUrl(script)
@@ -57,7 +54,7 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
 
   def callJS(call: String) {
     val func = call.replaceFirst("\\s*\\(.*$", "")
-    runJS(s"if(typeof($func)=='function') $call;")
+    runJS(s"if(typeof($func)=='function') $call; else console.warn('$func not defined');")
   }
 
   def loadJS(filename: String) {
@@ -69,10 +66,8 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
       //$d(s"Loaded $bytes bytes from '$filename'")
       val string = buffer.toString("UTF-8")
       //$d(s"Converted to string of ${string.size} characters:")
-      for (cc <- chromeClient) {
-        cc.lastRunJS = Some(string)
-        cc.lastRunTime = Some(SystemClock.uptimeMillis())
-      }
+      chromeClient.lastRunJS = Some(string)
+      chromeClient.lastRunTime = Some(SystemClock.uptimeMillis())
       string
     } map safeLoadUrl
   }
@@ -94,6 +89,35 @@ class WebView(implicit val context: Context) extends android.webkit.WebView(cont
     }
   }
 
+  class WebChromeClient extends android.webkit.WebChromeClient with Log {
+    var lastRunJS: Option[String] = None
+    var lastRunTime: Option[Long] = None
+
+    override def onConsoleMessage(message: ConsoleMessage): Boolean = {
+      val source = if(message.sourceId() == null)
+        "UNKNOWN"
+      else if (message.sourceId contains ":/")
+        URLDecoder.decode(message.sourceId)
+      else
+        message.sourceId
+      message.messageLevel match {
+        case ConsoleMessage.MessageLevel.ERROR => $e(source + ":" + message.lineNumber() + ": " + message.message())
+        case ConsoleMessage.MessageLevel.WARNING => $w(source + ":" + message.lineNumber() + ": " + message.message())
+        case _ => $d(source + ":" + message.lineNumber() + ": " + message.message())
+      }
+      if (message.messageLevel == ConsoleMessage.MessageLevel.ERROR ||
+        message.messageLevel == ConsoleMessage.MessageLevel.WARNING) {
+        for (js <- lastRunJS; time <- lastRunTime) {
+          if (message.sourceId() == null &&
+            message.lineNumber() <= js.lines.size &&
+            math.abs(SystemClock.uptimeMillis() - time) < 1000) {
+            $d("Possibly for this code:\n" + js)
+          }
+        }
+      }
+      true
+    }
+  }
 }
 
 object WebView {
@@ -129,35 +153,5 @@ class WebViewClient extends android.webkit.WebViewClient {
 
   def whenPageFinished(f: => Unit) {
     pageFinishedFunction = Some(() => f)
-  }
-}
-
-class WebChromeClient extends android.webkit.WebChromeClient with Log {
-  var lastRunJS: Option[String] = None
-  var lastRunTime: Option[Long] = None
-
-  override def onConsoleMessage(message: ConsoleMessage): Boolean = {
-    val source = if(message.sourceId() == null)
-      "UNKNOWN"
-    else if (message.sourceId contains ":/")
-      URLDecoder.decode(message.sourceId)
-    else
-      message.sourceId
-    message.messageLevel match {
-      case ConsoleMessage.MessageLevel.ERROR => $e(source + ":" + message.lineNumber() + ": " + message.message())
-      case ConsoleMessage.MessageLevel.WARNING => $w(source + ":" + message.lineNumber() + ": " + message.message())
-      case _ => $d(source + ":" + message.lineNumber() + ": " + message.message())
-    }
-    if (message.messageLevel == ConsoleMessage.MessageLevel.ERROR ||
-      message.messageLevel == ConsoleMessage.MessageLevel.WARNING) {
-      for (js <- lastRunJS; time <- lastRunTime) {
-        if (message.sourceId() == null &&
-          message.lineNumber() <= js.lines.size &&
-          math.abs(SystemClock.uptimeMillis() - time) < 1000) {
-          $d("Possibly for this code:\n" + lastRunJS)
-        }
-      }
-    }
-    true
   }
 }
