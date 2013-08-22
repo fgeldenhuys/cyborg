@@ -11,8 +11,12 @@ object debug {
     }
   }*/
 
+  def getStackTrace: String = {
+    new Throwable().getStackTrace.drop(2).mkString("\n>  ")
+  }
+
   def printStackTrace() {
-    $d((new Throwable()).getStackTrace.drop(2).mkString("\n>  "))
+    $d(getStackTrace)
   }
 
   def printMemoryUsage() {

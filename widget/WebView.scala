@@ -15,6 +15,7 @@ import scala.util.control.Exception._
 
 class WebView()(implicit val context: Context) extends android.webkit.WebView(context) with Log {
   val chromeClient: WebChromeClient = new WebChromeClient
+  super.setWebChromeClient(chromeClient)
 
   val webViewBitchHandler = handling(classOf[NullPointerException]) by { (ex) =>
     $d("WebView is being a little bitch again")
@@ -53,8 +54,9 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
   }
 
   def callJS(call: String) {
+    val callWithSemi = if (call.endsWith(";")) call else call + ";"
     val func = call.replaceFirst("\\s*\\(.*$", "")
-    runJS(s"if(typeof($func)=='function') $call; else console.warn('$func not defined');")
+    runJS(s"if(typeof($func)=='function') $callWithSemi else console.warn('$func not defined');")
   }
 
   def loadJS(filename: String) {

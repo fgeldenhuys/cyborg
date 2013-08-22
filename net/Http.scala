@@ -1,6 +1,11 @@
 package cyborg.net
 
 import cyborg.net.Http._
+import cyborg.net.Http.HttpParameters
+import cyborg.net.Http.SimpleHttpResult
+import cyborg.util.binary._
+import cyborg.util.execution._
+import cyborg.util.io._
 import java.io._
 import java.net.{CookieHandler, CookieManager, HttpURLConnection}
 import javax.net.ssl.SSLSocketFactory
@@ -10,12 +15,7 @@ import org.apache.http.message.BasicNameValuePair
 import scala.collection.JavaConversions._
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
-import cyborg.net.Http.HttpParameters
-import cyborg.net.Http.SimpleHttpResult
 import scala.Some
-import cyborg.util.io._
-import cyborg.util.binary._
 
 trait Http {
   import cyborg.Log._
@@ -23,7 +23,8 @@ trait Http {
   protected def createConnection(url: String)(implicit params: HttpParameters): HttpURLConnection
 
   def get(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
-         (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
+         (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+         : Future[HttpResult] = future {
     val fullUrl = url + "?" + makeGetParams(data)
     $d(s"[Http.get] GET '$fullUrl'")
     val http = createConnection(fullUrl)
@@ -51,37 +52,62 @@ trait Http {
   }
 
   def post(url: String, data: Map[String, String] = Map.empty)
-          (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
-    $d(s"[Http.post] POST '$url' $data")
-    val http = createConnection(url)(params.copy(chunked = false))
-    try {
-      http.setRequestMethod("POST")
-      http.setDoOutput(true)
-      val formEntity = makeFormParams(data)
-      http.setFixedLengthStreamingMode(formEntity.getContentLength.toInt)
-      val out = new BufferedOutputStream(http.getOutputStream)
-      formEntity.writeTo(out)
-      out.close()
-      val content = read(http.getInputStream)
-      val code = http.getResponseCode
-      http.disconnect()
-      SimpleHttpResult(code, content)
+          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+          : Future[HttpResult] =
+  {
+    val p = promise[HttpResult]()
+    future {
+      $d(s"[Http.post] POST '$url' $data")
+      val http = createConnection(url)(params.copy(chunked = false))
+      try {
+        http.setRequestMethod("POST")
+        http.setDoOutput(true)
+        val formEntity = makeFormParams(data)
+        http.setFixedLengthStreamingMode(formEntity.getContentLength.toInt)
+        val out = new BufferedOutputStream(http.getOutputStream)
+        formEntity.writeTo(out)
+        out.close()
+        //$d(s"[Http.post] Reading content.")
+        val content = read(http.getInputStream)
+        //$d(s"[Http.post] Content is ${content.length} bytes. Getting response code.")
+        val code = http.getResponseCode
+        //$d(s"[Http.post] Response code was $code.")
+        http.disconnect()
+        p success SimpleHttpResult(code, content)
+      }
+      catch {
+        case e: FileNotFoundException =>
+          $d("[Http.post] FileNotFoundException caught")
+          execute {
+            val errorContent = read(http.getErrorStream)
+            val responseCode = http.getResponseCode
+            $w(s"[Http.post] $responseCode $e for '$url'")
+            p success SimpleHttpResult(responseCode, errorContent)
+          } within (6 seconds) recover {
+            case CancelledExecution(message) =>
+              $w(s"[Http.post] Timeout error for '$url'")
+              p success SimpleHttpResult(-1, message)
+          }
+        case e: IOException =>
+          $d("[Http.post] IOException caught")
+          execute {
+            val errorContent = read(http.getErrorStream)
+            val responseCode = http.getResponseCode
+            $w(s"[Http.post] $responseCode $e for '$url'")
+            p success SimpleHttpResult(responseCode, errorContent)
+          } within (6 seconds) recover {
+            case CancelledExecution(message) =>
+              $w(s"[Http.post] Timeout error for '$url'")
+              p success SimpleHttpResult(-1, message)
+          }
+      }
     }
-    catch {
-      case e: FileNotFoundException =>
-        val errorContent = read(http.getErrorStream)
-        val responseCode = http.getResponseCode
-        $w(s"[Http.post] $responseCode $e for '$url'")
-        SimpleHttpResult(responseCode, errorContent)
-      case e: IOException =>
-        val errorContent = read(http.getErrorStream)
-        val responseCode = http.getResponseCode
-        $w(s"[Http.post] $responseCode $e for '$url'")
-        SimpleHttpResult(responseCode, errorContent)
-    }
+    p.future
   }
 
-  def delete(url: String)(implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
+  def delete(url: String)
+            (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+            : Future[HttpResult] = future {
     $d(s"[Http.delete] DELETE '$url'")
     val http = createConnection(url)
     try {
@@ -106,7 +132,8 @@ trait Http {
   }
 
   def getFile(url: String, outputFile: String, data: Map[String, String] = Map.empty)
-         (implicit params: HttpParameters = defaultHttpParameters): Future[HttpResult] = future {
+         (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+         : Future[HttpResult] = future {
     import cyborg.util.io._
     val fullUrl = url + "?" + makeGetParams(data)
     $d(s"[Http.getFile] GET '$fullUrl'")
@@ -160,13 +187,14 @@ object Http {
       http.createConnection(addHost(url))
     override def get(url: String, data: Map[String, String])
                     (progress: Option[(Bytes) => Any])
-                    (implicit params: HttpParameters): Future[HttpResult] =
-      http.get(addHost(url), data)(progress)(params)
-    override def post(url: String, data: Map[String, String])(implicit params: HttpParameters): Future[HttpResult] =
-      http.post(addHost(url), data)(params)
+                    (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
+      http.get(addHost(url), data)(progress)(params, sec)
+    override def post(url: String, data: Map[String, String])
+                     (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
+      http.post(addHost(url), data)(params, sec)
     override def getFile(url: String, outputFile: String, data: Map[String, String])
-                        (implicit params: HttpParameters): Future[HttpResult] =
-      http.getFile(addHost(url), outputFile, data)(params)
+                        (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
+      http.getFile(addHost(url), outputFile, data)(params, sec)
   }
 
   case class HttpParameters(
@@ -177,8 +205,8 @@ object Http {
   )
 
   val defaultHttpParameters = HttpParameters(
-    connectTimeout = (5 seconds),
-    readTimeout = (5 seconds),
+    connectTimeout = 5 seconds,
+    readTimeout = 5 seconds,
     chunked = true,
     socketFactory = None
   )
