@@ -5,6 +5,9 @@ import binary.Bytes
 
 object io {
   val BufferSize = 1024
+  val MaxBufferSize = 16 * 1024 * 1024
+
+  case class FileTooLargeException(message: String) extends IOException(message)
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
     val buf = new Array[Byte](BufferSize)
@@ -42,5 +45,18 @@ object io {
   implicit class OutputStreamExt(val out: OutputStream) extends AnyVal {
     def << (in: InputStream) { inStream2outStream(in, out) }
     def << (string: String) { out.write(string.getBytes("UTF-8")) }
+  }
+
+  implicit class FileExt(val file: File) extends AnyVal {
+    def read: Array[Byte] = {
+      val fileSize = file.length().toInt
+      if (fileSize > MaxBufferSize)
+        throw FileTooLargeException(s"File is $fileSize bytes large, maximum buffer is $MaxBufferSize bytes")
+      val in = new BufferedInputStream(new FileInputStream(file))
+      val buffer = Array.ofDim[Byte](fileSize)
+      in.read(buffer)
+      in.close()
+      buffer
+    }
   }
 }

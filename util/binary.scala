@@ -1,6 +1,7 @@
 package cyborg.util
 
 import java.nio.ByteBuffer
+import scala.util.control.Exception._
 
 object binary {
   object Bytes {
@@ -55,5 +56,9 @@ object binary {
           Integer.parseInt(byte, 16).toByte).toArray.reverse.padTo(minSize, 0.toByte).reverse
       }
     }
+
+    def hexToByteArrayOpt(minSize: Int = 0): Option[Array[Byte]] =
+      catching(classOf[InvalidHexString]).opt(hexToByteArray(minSize))
+
   }
 }

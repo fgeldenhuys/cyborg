@@ -2,6 +2,7 @@ package cyborg.widget
 
 import cyborg.util.NotImplemented
 import android.view.View
+import android.widget.ListAdapter
 
 object Accessors {
   implicit class ButtonAccessors(val b: android.widget.Button) extends AnyVal {
@@ -30,5 +31,10 @@ object Accessors {
     def textSize_=(s: Double) { tv.setTextSize(s.toFloat) }
     def visible = tv.getVisibility == View.VISIBLE
     def visible_=(v: Boolean) { tv.setVisibility(if(v) View.VISIBLE else View.INVISIBLE) }
+  }
+
+  implicit class ListViewAccessors(val lv: android.widget.ListView) extends AnyVal {
+    def adapter: ListAdapter = lv.getAdapter
+    def adapter_=(a: ListAdapter) { lv.setAdapter(a) }
   }
 }
