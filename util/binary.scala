@@ -27,7 +27,8 @@ object binary {
   implicit def bytes2int(b: Bytes): Int = b.toInt
 
   implicit class ByteArrayExt(val data: Array[Byte]) extends AnyVal {
-    def hexString = data.map("%02X" format _).mkString(" ")
+    def hexString(separator: String) = data.map("%02X" format _).mkString(separator)
+    def hexString: String = hexString(" ")
   }
 
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))

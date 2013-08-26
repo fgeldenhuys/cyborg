@@ -37,4 +37,9 @@ object Accessors {
     def adapter: ListAdapter = lv.getAdapter
     def adapter_=(a: ListAdapter) { lv.setAdapter(a) }
   }
+
+  implicit class GridViewAccessors(val gv: android.widget.GridView) extends AnyVal {
+    def numColumns = gv.getNumColumns
+    def numColumns_=(c: Int) { gv.setNumColumns(c) }
+  }
 }
