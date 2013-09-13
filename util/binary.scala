@@ -26,9 +26,30 @@ object binary {
 
   implicit def bytes2int(b: Bytes): Int = b.toInt
 
-  implicit class ByteArrayExt(val data: Array[Byte]) extends AnyVal {
+  implicit class BooleanCyborgExt(val value: Boolean) extends AnyVal {
+    def toByte = if (value) 1.toByte else 0.toByte
+  }
+
+  implicit class ByteCyborgExt(val byte: Byte) extends AnyVal {
+    def hexString: String = "%02X" format byte
+    def toBoolean: Boolean = byte != 0.toByte
+  }
+
+  implicit class ByteArrayCyborgExt(val data: Array[Byte]) extends AnyVal {
     def hexString(separator: String) = data.map("%02X" format _).mkString(separator)
     def hexString: String = hexString(" ")
+    def sameBytesAs (that: Array[Byte]): Boolean = {
+      if (data.size == that.size) {
+        // ugly for speed
+        var i = 0
+        while (i < data.size) {
+          if (data(i) != that(i)) return false
+          i += 1
+        }
+        true
+      }
+      else false
+    }
   }
 
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))
@@ -45,7 +66,7 @@ object binary {
   case class InvalidHexString(message: String) extends Exception(message)
   private val spacesRegex = """\s+""".r
   private val hexCharsRegex = """[0-9A-F]+""".r
-  implicit class HexStringExt(val string: String) extends AnyVal {
+  implicit class HexStringCyborgExt(val string: String) extends AnyVal {
     def hexToByteArray(minSize: Int = 0): Array[Byte] = {
       val preprocess = spacesRegex replaceAllIn (string, "") toUpperCase()
       if (preprocess.isEmpty)

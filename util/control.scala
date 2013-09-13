@@ -20,4 +20,7 @@ object control {
     ex.printStackTrace()
     failed
   }
+
+  case class NotImplemented(message: String = "Not implemented") extends Exception(message)
+  case class BreakException() extends Exception
 }

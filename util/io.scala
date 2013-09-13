@@ -2,6 +2,8 @@ package cyborg.util
 
 import java.io._
 import binary.Bytes
+import android.hardware.usb.{UsbEndpoint, UsbDeviceConnection}
+import scala.concurrent.duration.Duration
 
 object io {
   val BufferSize = 1024
@@ -58,5 +60,28 @@ object io {
       in.close()
       buffer
     }
+  }
+
+  implicit class UsbDeviceConnectionExt(val udc: UsbDeviceConnection) extends AnyVal {
+    def bulkRead(in: UsbEndpoint, bytes: Int, timeout: Duration): Option[Array[Byte]] = {
+      val buffer = new Array[Byte](bytes)
+      val read = udc.bulkTransfer(in, buffer, bytes, timeout.toMillis.toInt)
+      if (read >= 0) Some(buffer) else None
+    }
+
+    def bulkWrite(out: UsbEndpoint, data: Array[Byte], timeout: Duration): Boolean = {
+      import cyborg.Log._
+      //$d(s"writing ${data.size} bytes")
+      val write = udc.bulkTransfer(out, data, data.size, timeout.toMillis.toInt)
+      //if (write != data.size) $w(s"write $write != data.size ${data.size}")
+      write == data.size
+    }
+  }
+
+  case class Usb(connection: UsbDeviceConnection, in: UsbEndpoint, out: UsbEndpoint) {
+    def bulkRead(bytes: Int, timeout: Duration): Option[Array[Byte]] =
+      connection.bulkRead(in, bytes, timeout)
+    def bulkWrite(data: Array[Byte], timeout: Duration): Boolean =
+      connection.bulkWrite(out, data, timeout)
   }
 }

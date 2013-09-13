@@ -259,13 +259,13 @@ object SystemDownloader {
 
   private def cursor2download(cursor: Cursor): Option[Download] = {
     for {
-      id <- cursor.int(DM.COLUMN_ID)
-      status <- cursor.int(DM.COLUMN_STATUS)
-      title <- cursor(DM.COLUMN_TITLE)
+      id <- cursor.get[Int](DM.COLUMN_ID)
+      status <- cursor.get[Int](DM.COLUMN_STATUS)
+      title <- cursor.get[String](DM.COLUMN_TITLE)
     } yield {
-      val description = cursor(DM.COLUMN_DESCRIPTION)
-      val size = cursor.int(DM.COLUMN_TOTAL_SIZE_BYTES).map(Bytes(_))
-      val downloaded = cursor.int(DM.COLUMN_BYTES_DOWNLOADED_SO_FAR).map(Bytes(_))
+      val description = cursor.get[String](DM.COLUMN_DESCRIPTION)
+      val size = cursor.get[Int](DM.COLUMN_TOTAL_SIZE_BYTES).map(Bytes(_))
+      val downloaded = cursor.get[Int](DM.COLUMN_BYTES_DOWNLOADED_SO_FAR).map(Bytes(_))
       Download(
         title = title,
         id = Some(id),

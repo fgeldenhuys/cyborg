@@ -28,12 +28,20 @@ object execution {
 
   case class CancelledExecution(message: String) extends Exception(message)
 
-  class ExecuteWrapper[T](f: () => T)(implicit ses: ScheduledExecutorService) {
-    def within(d: Duration): Future[T] = {
+  class ExecuteWrapper[T](val fun: () => T,
+                          val afterwardsFun: Option[() => Any] = None) {
+    def now: T = {
+      val result = fun()
+      afterwardsFun.map(_())
+      result
+    }
+
+    def within(d: Duration)(implicit ses: ScheduledExecutorService): Future[T] = {
       val p = promise[T]()
       var scheduledCancel: Option[ScheduledFuture[_]] = None
       val sf = ses.schedule({
-        val result = f()
+        val result = fun()
+        afterwardsFun.map(_())
         scheduledCancel.map(_.cancel(false))
         p success result
       }, 0, TimeUnit.SECONDS)
@@ -47,7 +55,12 @@ object execution {
       }, d.toSeconds, TimeUnit.SECONDS))
       p.future
     }
+
+    def andAfterwards(f: => Any): ExecuteWrapper[T] = {
+      new ExecuteWrapper[T](fun, Some(() => f))
+    }
   }
 
-  def execute[T](f: => T)(implicit ses: ScheduledExecutorService) = new ExecuteWrapper[T](() => f)
+  def execute[T](f: => T) = new ExecuteWrapper[T](() => f)
+  implicit def implicitExecuteNow[T](ew: ExecuteWrapper[T]): T = ew.now
 }

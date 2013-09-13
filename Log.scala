@@ -4,7 +4,14 @@ import android.util.{Log => L}
 import java.text.SimpleDateFormat
 import java.util.Date
 
-trait Log {
+trait LogBase {
+  def $d(message: => String)
+  def $i(message: => String)
+  def $w(message: => String)
+  def $e(message: => String)
+}
+
+trait Log extends LogBase {
   val localTag: Option[String] = None
 
   def $d(message: => String) { Log.$d(message, localTag) }
@@ -15,10 +22,52 @@ trait Log {
 
 object Log {
   var globalTag = "cyborg"
-  val timeFormat = new SimpleDateFormat("yyMMdd.HHmmss.SSS")
+  var showDebugInfo = true
+  val TimeFormat = new SimpleDateFormat("yyMMdd.HHmmss.SSS")
+  val ParseAnon = """\.([\w\d_]+)\$\$anonfun\$([\w\d_]+)\$""".r
+
+  def debugInfo: String =
+    if (showDebugInfo) {
+      val time = TimeFormat.format(new Date())
+      val st = new Throwable().getStackTrace
+      st.find { ste =>
+        val fn = ste.getFileName
+        val cn = ste.getClassName
+        val mn = ste.getMethodName
+        !cn.startsWith("java.") &&
+          !cn.startsWith("scala.") &&
+          fn != "Log.scala" &&
+          fn != "Log.java" &&
+          !mn.startsWith("$")
+      } map { ste =>
+        val fn = ste.getFileName
+        val cn = ste.getClassName
+        val mn = ste.getMethodName
+        //L.d("wmgc", ste.toString)
+        //L.d("wmgc", s"cn=$cn mn=$mn")
+        val context: Option[String] =
+          if (fn.endsWith(".java")) {
+            Some(cn.substring(cn.lastIndexOf(".") + 1) + "." + mn)
+          }
+          else if (fn.endsWith(".scala")) {
+            Some(ParseAnon findFirstIn cn match {
+              case Some(ParseAnon(cls, fun)) =>
+                cls + "." + fun
+              case None =>
+                if (mn.contains("$$"))
+                  cn.substring(cn.lastIndexOf(".") + 1) + "." + mn.substring(mn.lastIndexOf("$$") + 2)
+                else
+                  cn.substring(cn.lastIndexOf(".") + 1) + "." + mn
+            })
+          }
+          else None
+        context map ( str => s"$time [$str]" ) getOrElse time
+      } getOrElse time
+    }
+    else ""
 
   def makeTag(localTag: Option[String]) = localTag.map(globalTag + "-" + _).orElse(Some(globalTag)).get
-  def makeMessage(message: String) = timeFormat.format(new Date()) + "  " + message
+  def makeMessage(message: String) = debugInfo + " " + message
 
   def $d(message: => String, tag: Option[String] = None) { L.d(makeTag(tag), makeMessage(message)) }
   def $i(message: => String, tag: Option[String] = None) { L.i(makeTag(tag), makeMessage(message)) }

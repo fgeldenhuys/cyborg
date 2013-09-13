@@ -4,6 +4,7 @@ import Context._
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import android.content.res.Configuration
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -23,6 +24,9 @@ class Activity extends android.app.Activity {
   }
 
   def findView[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
+
+  def isLandscape =
+    getResources.getConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
   def hideKeyboard() {
     val inputManager = getSystemService(android.content.Context.INPUT_METHOD_SERVICE)

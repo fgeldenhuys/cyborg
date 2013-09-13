@@ -12,7 +12,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
 
   // Select single value
   private val applyQuery = s"SELECT value FROM '$bucket' WHERE key = ?"
-  def apply(key: String): Option[String] = sqlite(applyQuery, key)("value")
+  def apply(key: String): Option[String] = sqlite.raw(applyQuery, key).get[String]("value")
 
   // Update a single value
   def update(key: String, value: String) {
@@ -30,31 +30,31 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   // All entries
   private val allQuery = s"SELECT key, value FROM '$bucket'"
   def all: Seq[(String, String)] =
-    for (row <- sqlite(allQuery).toList)
+    for (row <- sqlite.raw(allQuery).toList)
       yield (row("key"), row("value"))
 
   // Apply once-off filter for result
   private val selectQuery = s"SELECT key, value FROM '$bucket'"
   def select(filter: String => Boolean): List[(String, String)] =
-    for (row <- sqlite(selectQuery).toList if filter(row("key")))
+    for (row <- sqlite.raw(selectQuery).toList if filter(row("key")))
       yield (row("key"), row("value"))
 
   // Glob for entries
   private val findQuery = s"SELECT key, value FROM '$bucket' WHERE key GLOB ?"
   def find(glob: String): Seq[(String, String)] =
-    for (row <- sqlite(findQuery, glob).toList)
+    for (row <- sqlite.raw(findQuery, glob).toList)
       yield (row("key"), row("value"))
 
   // Apply once-off filter for result on glob
   private val findAndSelectQuery = s"SELECT key, value FROM '$bucket' WHERE key GLOB ?"
   def findAndSelect(glob: String, filter: String => Boolean): List[(String, String)] = {
-    for (row <- sqlite(findAndSelectQuery, glob).toList if filter(row("key")))
+    for (row <- sqlite.raw(findAndSelectQuery, glob).toList if filter(row("key")))
       yield (row("key"), row("value"))
   }
 
   class Binary {
     // Select single blob value
-    def apply(key: String): Option[Array[Byte]] = sqlite(applyQuery, key).blob("value")
+    def apply(key: String): Option[Array[Byte]] = sqlite.raw(applyQuery, key).get[Array[Byte]]("value")
 
     // Update a single blob value
     def update(key: String, value: Array[Byte]) {
@@ -65,7 +65,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     }
 
     def find(glob: String): Seq[(String, Array[Byte])] =
-      for (row <- sqlite(findQuery, glob).toBlobList)
+      for (row <- sqlite.raw(findQuery, glob).toBlobList)
         yield (row("key").left.get, row("value").right.get)
   }
   val binary = new Binary
@@ -73,15 +73,15 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   class StringIndex {
     val stringIndexStringQuery = s"SELECT stringindex FROM '$bucket' WHERE key = ?"
     def string(key: String): Option[String] =
-      sqlite(stringIndexStringQuery, key)("stringindex")
+      sqlite.raw(stringIndexStringQuery, key).get[String]("stringindex")
 
     val stringIndexKeysQuery = s"SELECT key FROM '$bucket' WHERE stringindex LIKE ?"
     def keys(find: String): List[String] =
-      sqlite(stringIndexKeysQuery, s"%$find%").toList("key")
+      sqlite.raw(stringIndexKeysQuery, s"%$find%").toList("key")
 
     val stringIndexQuery = s"SELECT value FROM '$bucket' WHERE stringindex LIKE ?"
     def apply(find: String): List[String] =
-      sqlite(stringIndexQuery, s"%$find%").toList("value")
+      sqlite.raw(stringIndexQuery, s"%$find%").toList("value")
 
 
     def update(key: String, string: String) {
