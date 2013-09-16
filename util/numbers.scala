@@ -18,12 +18,13 @@ object numbers {
     implicit def int2double(i: Int) = i.toDouble
   }
 
-  object StringConversionsWithDefaults {
+  object StringNumberConversionsCyborgExt {
     import scala.util.control.Exception._
     val numberFormatExceptionHandler = catching(classOf[NumberFormatException])
 
-    implicit class StringConversionsWithDefaults(val string: String) extends AnyVal {
+    implicit class StringNumberConversionsCyborgExt(val string: String) extends AnyVal {
       def toIntElse(d: Int) = numberFormatExceptionHandler.opt(string.toInt).getOrElse(d)
+      def isInt = numberFormatExceptionHandler opt {string.toInt; true} getOrElse false
     }
   }
 

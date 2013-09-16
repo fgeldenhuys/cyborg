@@ -3,6 +3,7 @@ package cyborg
 import android.util.{Log => L}
 import java.text.SimpleDateFormat
 import java.util.Date
+import cyborg.util.numbers.StringNumberConversionsCyborgExt._
 
 trait LogBase {
   def $d(message: => String)
@@ -51,9 +52,9 @@ object Log {
           }
           else if (fn.endsWith(".scala")) {
             Some(if (cn contains "$$") {
-              val tmp = cn.split("\\$\\$").map(_.split("\\$").takeRight(2).head)
-              val method = tmp.tail.reverse.find(_ != "apply") getOrElse "apply"
-              val cls = tmp.head.substring(tmp.head.lastIndexOf(".") + 1)
+              val tmp = cn.split("\\$\\$").map(_.split("\\$").takeRight(2))
+              val method = tmp.filter(_.last.isInt).map(_.head).reverse.dropWhile(_ == "apply").reverse.mkString(" ")
+              val cls = tmp.head.head.substring(tmp.head.lastIndexOf(".") + 1)
               cls + " " + method
             }
             else {
