@@ -26,7 +26,7 @@ trait Http {
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
          : Future[HttpResult] = future {
     val fullUrl = url + "?" + makeGetParams(data)
-    $d(s"[Http.get] GET '$fullUrl'")
+    $d(s"GET '$fullUrl'")
     val http = createConnection(fullUrl)
     try {
       val inputStream = http.getInputStream
@@ -41,12 +41,12 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.get] $responseCode $e for '$fullUrl'")
+        $w(s"$responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.get] $responseCode $e for '$fullUrl'")
+        $w(s"$responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }
@@ -57,7 +57,7 @@ trait Http {
   {
     val p = promise[HttpResult]()
     future {
-      $d(s"[Http.post] POST '$url' $data")
+      $d(s"POST '$url' $data")
       val http = createConnection(url)(params.copy(chunked = false))
       try {
         http.setRequestMethod("POST")
@@ -77,27 +77,27 @@ trait Http {
       }
       catch {
         case e: FileNotFoundException =>
-          $d("[Http.post] FileNotFoundException caught")
+          $d("FileNotFoundException caught")
           execute {
             val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
-            $w(s"[Http.post] $responseCode $e for '$url'")
+            $w(s"$responseCode $e for '$url'")
             p success SimpleHttpResult(responseCode, errorContent)
           } within (6 seconds) recover {
             case CancelledExecution(message) =>
-              $w(s"[Http.post] Timeout error for '$url'")
+              $w(s"Timeout error for '$url'")
               p success SimpleHttpResult(-1, message)
           }
         case e: IOException =>
-          $d("[Http.post] IOException caught")
+          $d("IOException caught")
           execute {
             val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
-            $w(s"[Http.post] $responseCode $e for '$url'")
+            $w(s"$responseCode $e for '$url'")
             p success SimpleHttpResult(responseCode, errorContent)
           } within (6 seconds) recover {
             case CancelledExecution(message) =>
-              $w(s"[Http.post] Timeout error for '$url'")
+              $w(s"Timeout error for '$url'")
               p success SimpleHttpResult(-1, message)
           }
       }
@@ -108,7 +108,7 @@ trait Http {
   def delete(url: String)
             (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
             : Future[HttpResult] = future {
-    $d(s"[Http.delete] DELETE '$url'")
+    $d(s"DELETE '$url'")
     val http = createConnection(url)
     try {
       http.setRequestMethod("DELETE")
@@ -121,12 +121,12 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.delete] $responseCode $e for '$url'")
+        $w(s"$responseCode $e for '$url'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.delete] $responseCode $e for '$url'")
+        $w(s"$responseCode $e for '$url'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }
@@ -136,7 +136,7 @@ trait Http {
          : Future[HttpResult] = future {
     import cyborg.util.io._
     val fullUrl = url + "?" + makeGetParams(data)
-    $d(s"[Http.getFile] GET '$fullUrl'")
+    $d(s"GET '$fullUrl'")
     val http = createConnection(fullUrl)
     try {
       val in = http.getInputStream
@@ -146,7 +146,7 @@ trait Http {
         file.getCanonicalFile.getParentFile.mkdirs()
         file.createNewFile()
         val size = inStream2NewFile(in, file)
-        $d(s"[Http.getFile] Downloaded '${file.getAbsolutePath}' of size $size")
+        $d(s"Downloaded '${file.getAbsolutePath}' of size $size")
         file.getAbsolutePath
       } else read(http.getErrorStream)
       http.disconnect()
@@ -156,12 +156,12 @@ trait Http {
       case e: FileNotFoundException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.getFile] $responseCode $e for '$fullUrl'")
+        $w(s"$responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
       case e: IOException =>
         val errorContent = read(http.getErrorStream)
         val responseCode = http.getResponseCode
-        $w(s"[Http.getFile] $responseCode $e for '$fullUrl'")
+        $w(s"$responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
     }
   }

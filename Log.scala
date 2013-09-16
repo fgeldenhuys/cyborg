@@ -44,12 +44,25 @@ object Log {
         val cn = ste.getClassName
         val mn = ste.getMethodName
         //L.d("wmgc", ste.toString)
-        //L.d("wmgc", s"cn=$cn mn=$mn")
+        L.d("wmgc", s"cn=$cn mn=$mn")
         val context: Option[String] =
           if (fn.endsWith(".java")) {
-            Some(cn.substring(cn.lastIndexOf(".") + 1) + "." + mn)
+            Some(cn.substring(cn.lastIndexOf(".") + 1) + " " + mn)
           }
           else if (fn.endsWith(".scala")) {
+            Some(if (cn contains "$$") {
+              val tmp = cn.split("\\$\\$").map(_.split("\\$").takeRight(2).head)
+              val method = tmp.tail.reverse.find(_ != "apply") getOrElse "apply"
+              val cls = tmp.head.substring(tmp.head.lastIndexOf(".") + 1)
+              cls + " " + method
+            }
+            else {
+              if (mn.contains("$$"))
+                cn.substring(cn.lastIndexOf(".") + 1) + " " + mn.substring(mn.lastIndexOf("$$") + 2)
+              else
+                cn.substring(cn.lastIndexOf(".") + 1) + " " + mn
+            })
+            /*
             Some(ParseAnon findFirstIn cn match {
               case Some(ParseAnon(cls, fun)) =>
                 cls + "." + fun
@@ -58,7 +71,7 @@ object Log {
                   cn.substring(cn.lastIndexOf(".") + 1) + "." + mn.substring(mn.lastIndexOf("$$") + 2)
                 else
                   cn.substring(cn.lastIndexOf(".") + 1) + "." + mn
-            })
+            })*/
           }
           else None
         context map ( str => s"$time [$str]" ) getOrElse time
