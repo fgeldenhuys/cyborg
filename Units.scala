@@ -1,5 +1,7 @@
 package cyborg
 
+import cyborg.Context._
+
 object Units {
   class DisplayMetric(val value: Double)(implicit context: Context) {
     def dip: Int = (value * context.getResources.getDisplayMetrics.density).toInt

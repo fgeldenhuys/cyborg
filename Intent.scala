@@ -1,5 +1,7 @@
 package cyborg
 
+import cyborg.Context._
+
 object Intent {
   implicit class IntentExt(val self: android.content.Intent) extends AnyVal {
     def start(implicit activity: Activity) { activity.startActivity(self) }

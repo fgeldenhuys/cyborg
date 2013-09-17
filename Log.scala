@@ -25,7 +25,6 @@ object Log {
   var globalTag = "cyborg"
   var showDebugInfo = true
   val TimeFormat = new SimpleDateFormat("yyMMdd.HHmmss.SSS")
-  val ParseAnon = """\.([\w\d_]+)\$\$anonfun\$([\w\d_]+)\$""".r
 
   def debugInfo: String =
     if (showDebugInfo) {
@@ -44,8 +43,7 @@ object Log {
         val fn = ste.getFileName
         val cn = ste.getClassName
         val mn = ste.getMethodName
-        //L.d("wmgc", ste.toString)
-        L.d("wmgc", s"cn=$cn mn=$mn")
+        //L.d("wmgc", s"cn=$cn mn=$mn")
         val context: Option[String] =
           if (fn.endsWith(".java")) {
             Some(cn.substring(cn.lastIndexOf(".") + 1) + " " + mn)
@@ -53,9 +51,10 @@ object Log {
           else if (fn.endsWith(".scala")) {
             Some(if (cn contains "$$") {
               val tmp = cn.split("\\$\\$").map(_.split("\\$").takeRight(2))
-              val method = tmp.filter(_.last.isInt).map(_.head).reverse.dropWhile(_ == "apply").reverse.mkString(" ")
-              val cls = tmp.head.head.substring(tmp.head.lastIndexOf(".") + 1)
-              cls + " " + method
+              val method = tmp.filter(_.last.isInt).map(_.head).reverse.dropWhile(_ == "apply").reverse.mkString(" ", " ", "")
+              val pkg = tmp.head.head
+              val cls = pkg.substring(pkg.lastIndexOf(".") + 1)
+              cls + method
             }
             else {
               if (mn.contains("$$"))
@@ -63,16 +62,6 @@ object Log {
               else
                 cn.substring(cn.lastIndexOf(".") + 1) + " " + mn
             })
-            /*
-            Some(ParseAnon findFirstIn cn match {
-              case Some(ParseAnon(cls, fun)) =>
-                cls + "." + fun
-              case None =>
-                if (mn.contains("$$"))
-                  cn.substring(cn.lastIndexOf(".") + 1) + "." + mn.substring(mn.lastIndexOf("$$") + 2)
-                else
-                  cn.substring(cn.lastIndexOf(".") + 1) + "." + mn
-            })*/
           }
           else None
         context map ( str => s"$time [$str]" ) getOrElse time

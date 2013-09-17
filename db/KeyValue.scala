@@ -1,6 +1,6 @@
 package cyborg.db
 
-import cyborg.Context
+import cyborg.Context._
 import cyborg.db.SQLite._
 import android.database.sqlite.{SQLiteDatabaseLockedException, SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.Log._

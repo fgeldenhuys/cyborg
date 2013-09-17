@@ -3,7 +3,7 @@ package cyborg.widget
 import android.os.SystemClock
 import android.webkit
 import android.webkit.{ConsoleMessage, MimeTypeMap}
-import cyborg.Context
+import cyborg.Context._
 import cyborg.Log
 import cyborg.net.URIExt._
 import cyborg.util.execution._

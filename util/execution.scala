@@ -1,6 +1,6 @@
 package cyborg.util
 
-import cyborg.Context
+import cyborg.Context._
 import android.os.Handler
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -36,24 +36,40 @@ object execution {
       result
     }
 
-    def within(d: Duration)(implicit ses: ScheduledExecutorService): Future[T] = {
-      val p = promise[T]()
+    def within(d: Duration)(implicit sec: ScheduledExecutionContext): Future[T] = {
+      val p = promise[T]
       var scheduledCancel: Option[ScheduledFuture[_]] = None
-      val sf = ses.schedule({
+      val sf = sec.schedule({
         val result = fun()
         afterwardsFun.map(_())
         scheduledCancel.map(_.cancel(false))
         p success result
       }, 0, TimeUnit.SECONDS)
-      scheduledCancel = Some(ses.schedule({
+      scheduledCancel = Some(sec.schedule({
         if (sf.cancel(true))
           p failure CancelledExecution("Timeout reached, function cancelled")
         else {
           $w("Failed to cancel execution, but failing the future. The thread might be blocked forever.")
           p failure CancelledExecution("Timeout reached, failed to cancel function")
         }
-      }, d.toSeconds, TimeUnit.SECONDS))
+      }, d.toMillis, TimeUnit.MILLISECONDS))
       p.future
+    }
+
+    def afterDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): Future[T] = {
+      val p = promise[T]
+      sec.schedule({
+        val result = fun()
+        afterwardsFun.map(_())
+        p success result
+      }, d.toMillis, TimeUnit.MILLISECONDS)
+      p.future
+    }
+
+    def repeatedWithDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): ScheduledFuture[_] = {
+      sec.scheduleWithFixedDelay({
+        fun()
+      }, 0, d.toMillis, TimeUnit.MILLISECONDS)
     }
 
     def andAfterwards(f: => Any): ExecuteWrapper[T] = {

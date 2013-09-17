@@ -1,5 +1,7 @@
 package cyborg
 
+import cyborg.Context._
+
 object Preferences {
   case class Preferences(section: String) {
     def apply[T](key: String)(implicit prop: Prop[T], context: Context): Option[T] =
