@@ -16,7 +16,7 @@ object Color {
         buffer append strings.next
       }
       val str = buffer.toString
-      $d(s"make color from $str")
+      //$d(s"make color from $str")
 
       if (str(0) == '#' && str.length == 3) { // #GG
         val i = str.substring(1,3)

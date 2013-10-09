@@ -34,6 +34,11 @@ object SQLite {
       cv.put(key, value)
     }
   }
+  implicit val byteArrayContentValuesPutter = new ContentValuesPutter[Array[Byte]] {
+    def apply(cv: ContentValues, key: String, value: Array[Byte]) {
+      cv.put(key, value)
+    }
+  }
 
   implicit class Database(val db: ASQLD) extends AnyVal {
     def apply[T](f: (ASQLD) => T): T = {
@@ -62,6 +67,16 @@ object SQLite {
       }
     }
 
+    def delete(table: String, whereClause: String, whereArgs: Any*): Int =
+      db.delete(table, whereClause, whereArgs.map(_.toString).toArray)
+
+    def makeContentValues[T1](v1: (String, T1))
+                             (implicit cvputter1: ContentValuesPutter[T1]): ContentValues = {
+      val cv = new ContentValues(2)
+      cvputter1(cv, v1._1, v1._2)
+      cv
+    }
+
     def makeContentValues[T1, T2](v1: (String, T1), v2: (String, T2))
                                      (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2]): ContentValues = {
       val cv = new ContentValues(2)
@@ -79,11 +94,28 @@ object SQLite {
       cv
     }
 
+    def insert[T1, T2](table: String, v1: (String, T1), v2: (String, T2))
+                          (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2]): Option[Long] = {
+      val result = db.insert(table, null, makeContentValues(v1, v2))
+      if (result == -1) None else Some(result)
+    }
+
     def insert[T1, T2, T3](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3))
                           (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3]): Option[Long] = {
       val result = db.insert(table, null, makeContentValues(v1, v2, v3))
       if (result == -1) None else Some(result)
     }
+
+    def replace[T1, T2](table: String, v1: (String, T1), v2: (String, T2))
+                   (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2]): Option[Long] = {
+      val result = db.replace(table, null, makeContentValues(v1, v2))
+      if (result == -1) None else Some(result)
+    }
+
+    def update[T1](table: String, v1: (String, T1),
+                       whereClause: String, whereArgs: Any*)
+                      (implicit cvputter1: ContentValuesPutter[T1]): Int =
+      db.update(table, makeContentValues(v1), whereClause, whereArgs.map(_.toString).toArray)
 
     def update[T1, T2](table: String, v1: (String, T1), v2: (String, T2),
                            whereClause: String, whereArgs: Any*)
@@ -219,6 +251,14 @@ object SQLite {
 
       if (cursor.isAfterLast) acc
       else toBlobListHelper(cursor2blobMap(cursor) :: acc)
+    }
+
+    // Use when SELECT COUNT(*) type query was used
+    def countQueryResult: Int = {
+      cursor.moveToFirst()
+      if (cursor.getCount > 0 && cursor.getColumnCount > 0)
+        cursor.getInt(0)
+      else 0
     }
   }
 }

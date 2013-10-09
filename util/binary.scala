@@ -2,6 +2,7 @@ package cyborg.util
 
 import java.nio.ByteBuffer
 import scala.util.control.Exception._
+import java.io.ByteArrayOutputStream
 
 object binary {
   object Bytes {
@@ -53,12 +54,12 @@ object binary {
   }
 
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))
-  implicit class ByteBufferExt(val data: ByteBuffer) extends AnyVal {
+  implicit class ByteBufferCyborgExt(val data: ByteBuffer) extends AnyVal {
     def hexString = data.array().map("%02X" format _).mkString(" ")
     def << (byte: Byte): ByteBuffer = data.put(byte)
     def << (int: Int): ByteBuffer = data.putInt(int)
     def << (short: Short): ByteBuffer = data.putShort(short)
-    def << (a: Array[Byte]): ByteBuffer = data.put(a)
+    def << (bytes: Array[Byte]): ByteBuffer = data.put(bytes)
     def << (string: String): ByteBuffer = data.put(string.getBytes("UTF-8"))
     def pad(byte: Byte): ByteBuffer = data.put(Array.fill[Byte](data.remaining())(byte))
   }

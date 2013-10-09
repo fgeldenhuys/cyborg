@@ -1,9 +1,10 @@
 package cyborg.util
 
-import java.io._
-import binary.Bytes
 import android.hardware.usb.{UsbEndpoint, UsbDeviceConnection}
+import cyborg.util.binary._
+import java.io._
 import scala.concurrent.duration.Duration
+import java.nio.ByteBuffer
 
 object io {
   val BufferSize = 1024
@@ -44,12 +45,36 @@ object io {
     inStream2outStream(in, out)
   }
 
-  implicit class OutputStreamExt(val out: OutputStream) extends AnyVal {
-    def << (in: InputStream) { inStream2outStream(in, out) }
-    def << (string: String) { out.write(string.getBytes("UTF-8")) }
+  implicit class OutputStreamCyborgExt(val out: OutputStream) extends AnyVal {
+    def << (in: InputStream): OutputStream = { inStream2outStream(in, out); out }
+    def << (string: String): OutputStream = { out.write(string.getBytes("UTF-8")); out }
+    def << (byte: Byte): OutputStream = { out.write(byte); out }
+    def << (int: Int): OutputStream = { out.write(arrayByteBuffer(4) << int array()); out }
+    def << (bytes: Array[Byte]): OutputStream = { out.write(bytes); out }
+    def encString (string: String): OutputStream = {
+      val bytes = string.getBytes("UTF-8")
+      out << bytes.size << bytes
+      out
+    }
   }
 
-  implicit class FileExt(val file: File) extends AnyVal {
+  implicit class InputStreamCyborgExt(val in: InputStream) extends AnyVal {
+    def bytes(size: Int): Array[Byte] = {
+      val buffer = Array.ofDim[Byte](size)
+      in.read(buffer)
+      buffer
+    }
+    def byte: Byte = bytes(1)(0)
+    def int: Int = ByteBuffer.wrap(bytes(4)).getInt
+    def string(size: Int): String = new String(bytes(size), "UTF-8") //WARNING: size in bytes, not encoded characters
+    def decString: String = {
+      val size = in.int
+      val bytes = in.bytes(size)
+      new String(bytes, "UTF-8")
+    }
+  }
+
+  implicit class FileCyborgExt(val file: File) extends AnyVal {
     def read: Array[Byte] = {
       val fileSize = file.length().toInt
       if (fileSize > MaxBufferSize)

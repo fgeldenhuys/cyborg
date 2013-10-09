@@ -5,6 +5,7 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import android.content.res.Configuration
+import cyborg.util.events.Observable
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -34,13 +35,21 @@ class Activity extends android.app.Activity {
     inputManager.hideSoftInputFromWindow(getCurrentFocus.getWindowToken,
       InputMethodManager.HIDE_NOT_ALWAYS)
   }
-
-  def toast(message: String) {
-    runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
-  }
 }
 
 object Activity {
   val ResultOk = android.app.Activity.RESULT_OK
   val ResultCanceled = android.app.Activity.RESULT_CANCELED
+
+  def toast(message: String)(implicit activity: android.app.Activity) {
+    activity.runOnUiThread(new Runnable {
+      def run() { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
+    })
+  }
+
+  implicit class ActivityObservableExtensions[T](val obs: Observable[T, Any]) extends AnyVal {
+    def subOnUiThread(f: (T) => Any)(implicit activity: Activity): (T) => Any = {
+      obs sub { v => activity.runOnUiThread(f(v)) }
+    }
+  }
 }

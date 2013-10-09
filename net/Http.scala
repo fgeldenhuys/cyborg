@@ -7,7 +7,7 @@ import cyborg.util.binary._
 import cyborg.util.execution._
 import cyborg.util.io._
 import java.io._
-import java.net.{CookieHandler, CookieManager, HttpURLConnection}
+import java.net.{URLEncoder, CookieHandler, CookieManager, HttpURLConnection}
 import javax.net.ssl.SSLSocketFactory
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.utils.URLEncodedUtils
@@ -251,4 +251,5 @@ object Http {
       (params map { case (k: String,v: String) =>
         new BasicNameValuePair(k, v) }).toList)
   }
+
 }

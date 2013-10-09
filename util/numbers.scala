@@ -1,11 +1,18 @@
 package cyborg.util
 
+import scala.util.control.Exception._
+import scala.Some
+
 object numbers {
+  private val numberFormatExceptionHandler = catching(classOf[NumberFormatException])
+
   object ValidInt {
     def unapply(i: BigInt): Option[Int] = if (i.isValidInt) Some(i.toInt) else None
+    def unapply(s: String): Option[Int] = numberFormatExceptionHandler.opt(s.toInt)
   }
   object ValidLong {
     def unapply(l: BigInt): Option[Long] = if (l.isValidLong) Some(l.toLong) else None
+    def unapply(s: String): Option[Long] = numberFormatExceptionHandler.opt(s.toLong)
   }
 
   object ImplicitDoubleFloatConversions {
@@ -20,7 +27,6 @@ object numbers {
 
   object StringNumberConversionsCyborgExt {
     import scala.util.control.Exception._
-    val numberFormatExceptionHandler = catching(classOf[NumberFormatException])
 
     implicit class StringNumberConversionsCyborgExt(val string: String) extends AnyVal {
       def toIntElse(d: Int) = numberFormatExceptionHandler.opt(string.toInt).getOrElse(d)
