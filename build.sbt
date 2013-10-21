@@ -10,7 +10,7 @@ version := "0.1"
 versionCode := 0
 
 // Version of Scala
-scalaVersion := "2.10.2"
+scalaVersion := "2.10.3"
 
 // Version of the Android platform SDK
-platformName := "android-18"
+platformName := "android-15"
