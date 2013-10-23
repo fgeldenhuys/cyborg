@@ -3,6 +3,7 @@ package cyborg.util
 import java.nio.ByteBuffer
 import scala.util.control.Exception._
 import java.io.ByteArrayOutputStream
+import android.util.Base64
 
 object binary {
   object Bytes {
@@ -51,6 +52,8 @@ object binary {
       }
       else false
     }
+    def base64: String = Base64.encodeToString(data, Base64.DEFAULT)
+    def toShort: Short = ByteBuffer.wrap(data).getShort
   }
 
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))

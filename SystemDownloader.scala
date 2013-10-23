@@ -17,7 +17,10 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-class SystemDownloader(val onSuccess: () => Any)(implicit context: Context) {
+class SystemDownloader(
+                        val onSuccess: (String) => Any,
+                        val onFailure: (String) => Any
+                        )(implicit context: Context) {
   import SystemDownloader._
   import cyborg.Log._
 
@@ -89,6 +92,7 @@ class SystemDownloader(val onSuccess: () => Any)(implicit context: Context) {
         download.removeFrom(store)
         download.tmpFile map (new File(_).delete())
         download.id map (downloadManager.remove(_))
+        onFailure(download.bookId getOrElse "")
       }
       download
     }
@@ -107,7 +111,7 @@ class SystemDownloader(val onSuccess: () => Any)(implicit context: Context) {
             targetFile.getParentFile.mkdirs()
             inStream2NewFile(in, targetFile)
             in.close()
-            onSuccess()
+            onSuccess(targetFile.getAbsolutePath)
           case None =>
             $w(s"No filename specified for '${download.title}'")
         }
@@ -171,7 +175,8 @@ object SystemDownloader {
     tmpFile: Option[String] = None,
     description: Option[String] = None,
     size: Option[Bytes] = None,
-    downloaded: Option[Bytes] = None
+    downloaded: Option[Bytes] = None,
+    bookId: Option[String] = None
   ) {
     override def toString = s"Download($id '$title' $statusString [$uri])"
 
@@ -186,7 +191,8 @@ object SystemDownloader {
                 title = check.title,
                 description = check.description,
                 size = check.size,
-                downloaded = check.downloaded)
+                downloaded = check.downloaded,
+                bookId = check.bookId)
             }
           }
           cursor.moveToNext()
@@ -225,6 +231,7 @@ object SystemDownloader {
         tmpFile.map(edit.putString(pre + "tmpfile", _))
         description.map(edit.putString(pre + "description", _))
         size.map(edit.putInt(pre + "size", _))
+        bookId.map(edit.putString(pre + "bookid", _))
         edit.apply()
       }
       this
@@ -239,6 +246,7 @@ object SystemDownloader {
         if (tmpFile.isEmpty) p[String](pre + "tmpfile").map(x => updated = updated.copy(tmpFile = Some(x)))
         if (description.isEmpty) p[String](pre + "description").map(x => updated = updated.copy(description = Some(x)))
         if (size.isEmpty) p[Int](pre + "size").map(x => updated = updated.copy(size = Some(Bytes(x))))
+        if (bookId.isEmpty) p[String](pre + "bookid").map(x => updated = updated.copy(bookId = Some(x)))
         updated
       }) getOrElse this
     }
@@ -252,6 +260,7 @@ object SystemDownloader {
         edit.remove(pre + "tmpfile")
         edit.remove(pre + "description")
         edit.remove(pre + "size")
+        edit.remove(pre + "bookid")
         edit.apply()
         true
       }) getOrElse false

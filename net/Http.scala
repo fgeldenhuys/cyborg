@@ -26,7 +26,7 @@ trait Http {
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
          : Future[HttpResult] = future {
     val fullUrl = url + "?" + makeGetParams(data)
-    $d(s"GET '$fullUrl'")
+    $d(s"GET '$fullUrl'", 1)
     val http = createConnection(fullUrl)
     try {
       val inputStream = http.getInputStream
@@ -57,7 +57,7 @@ trait Http {
   {
     val p = promise[HttpResult]()
     future {
-      $d(s"POST '$url' $data")
+      $d(s"POST '$url' $data", 1)
       val http = createConnection(url)(params.copy(chunked = false))
       try {
         http.setRequestMethod("POST")
@@ -83,19 +83,19 @@ trait Http {
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$url'")
             p success SimpleHttpResult(responseCode, errorContent)
-          } within (6 seconds) recover {
+          } within (10 seconds) recover {
             case CancelledExecution(message) =>
               $w(s"Timeout error for '$url'")
               p success SimpleHttpResult(-1, message)
           }
         case e: IOException =>
-          $d("IOException caught")
+          $d(s"IOException caught for '$url'")
           execute {
             val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$url'")
             p success SimpleHttpResult(responseCode, errorContent)
-          } within (6 seconds) recover {
+          } within (10 seconds) recover {
             case CancelledExecution(message) =>
               $w(s"Timeout error for '$url'")
               p success SimpleHttpResult(-1, message)
@@ -108,7 +108,7 @@ trait Http {
   def delete(url: String)
             (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
             : Future[HttpResult] = future {
-    $d(s"DELETE '$url'")
+    $d(s"DELETE '$url'", 1)
     val http = createConnection(url)
     try {
       http.setRequestMethod("DELETE")
@@ -136,7 +136,7 @@ trait Http {
          : Future[HttpResult] = future {
     import cyborg.util.io._
     val fullUrl = url + "?" + makeGetParams(data)
-    $d(s"GET '$fullUrl'")
+    $d(s"GET '$fullUrl'", 1)
     val http = createConnection(fullUrl)
     try {
       val in = http.getInputStream

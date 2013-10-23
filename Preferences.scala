@@ -12,6 +12,13 @@ object Preferences {
     def delete[T](key: String)(implicit prop: Prop[T], context: Context) {
       prop.del(section, key)
     }
+    def setOrDelete[T](key: String, value: Option[T])(implicit prop: Prop[T], context: Context) {
+      value map (prop.set(section, key, _)) getOrElse prop.del(section, key)
+    }
+    def makeDefault[T](key: String, value: T)(implicit prop: Prop[T], context: Context) {
+      if (prop.get(section, key).isEmpty) prop.set(section, key, value)
+    }
+    def ? (key: String)(implicit prop: Prop[Boolean], context: Context): Boolean = apply[Boolean](key) getOrElse false
     def raw(implicit context: Context) = context.getSharedPreferences(section, 0)
     def java(implicit context: android.content.Context): JavaPreferences =
       new JavaPreferences(context, section)

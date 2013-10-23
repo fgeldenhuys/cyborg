@@ -5,6 +5,11 @@ import android.view.View
 import android.widget.ListAdapter
 
 object Accessors {
+  implicit class ViewAccessors(val v: android.view.View) extends AnyVal {
+    def visible = v.getVisibility == View.VISIBLE
+    def visible_=(b: Boolean) { v.setVisibility(if (b) View.VISIBLE else View.INVISIBLE) }
+  }
+
   implicit class ButtonAccessors(val b: android.widget.Button) extends AnyVal {
     def focus() { b.setFocusableInTouchMode(true); b.requestFocus() }
   }
@@ -29,8 +34,6 @@ object Accessors {
     def text_=(text: CharSequence) { tv.setText(text) }
     def textSize = tv.getTextSize
     def textSize_=(s: Double) { tv.setTextSize(s.toFloat) }
-    def visible = tv.getVisibility == View.VISIBLE
-    def visible_=(v: Boolean) { tv.setVisibility(if(v) View.VISIBLE else View.INVISIBLE) }
   }
 
   implicit class ListViewAccessors(val lv: android.widget.ListView) extends AnyVal {

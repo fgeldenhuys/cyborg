@@ -7,11 +7,16 @@ import android.widget.AdapterView
 import android.widget.AdapterView.OnItemClickListener
 
 object Events {
-  implicit class ButtonEvents(val button: android.widget.Button) {
-    def onClick(f: => Any) { button.setOnClickListener(new OnClickListener {
+  implicit class ViewEvents(val view: android.view.View) {
+    def onClick(f: => Any) { view.setOnClickListener(new OnClickListener {
       def onClick(v: View) { f }
     })}
   }
+  /*implicit class ButtonEvents(val button: android.widget.Button) {
+    def onClick(f: => Any) { button.setOnClickListener(new OnClickListener {
+      def onClick(v: View) { f }
+    })}
+  }*/
   implicit class TextViewEvents(val textView: android.widget.TextView) {
     def onTextChanged(f: (CharSequence) => Any) { textView.addTextChangedListener(new TextWatcher {
       val textChangedFun = (text: CharSequence) => f(text)
