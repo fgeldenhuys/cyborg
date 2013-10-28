@@ -25,7 +25,8 @@ trait Http {
   def get(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
          : Future[HttpResult] = future {
-    val fullUrl = url + "?" + makeGetParams(data)
+    val getParams = makeGetParams(data)
+    val fullUrl = url + (if (getParams.isEmpty) "" else "?" + getParams)
     $d(s"GET '$fullUrl'", 1)
     val http = createConnection(fullUrl)
     try {
@@ -136,7 +137,7 @@ trait Http {
          : Future[HttpResult] = future {
     import cyborg.util.io._
     val fullUrl = url + "?" + makeGetParams(data)
-    $d(s"GET '$fullUrl'", 1)
+    $d(s"GET FILE '$fullUrl'", 1)
     val http = createConnection(fullUrl)
     try {
       val in = http.getInputStream
@@ -164,6 +165,23 @@ trait Http {
         $w(s"$responseCode $e for '$fullUrl'")
         SimpleHttpResult(responseCode, errorContent)
     }
+  }
+
+  def getBytes(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
+         (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+  : Future[Array[Byte]] = future {
+    val getParams = makeGetParams(data)
+    val fullUrl = url + (if (getParams.isEmpty) "" else "?" + getParams)
+    $d(s"GET BYTES '$fullUrl'", 1)
+    val http = createConnection(fullUrl)
+    val inputStream = http.getInputStream
+    val bytes = new ByteArrayOutputStream()
+    if (progress.isDefined)
+      inStream2outStreamWithProgress(inputStream, bytes)(progress.get)
+    else
+      inStream2outStream(inputStream, bytes)
+    http.disconnect()
+    bytes.toByteArray
   }
 
   def withHost(host: String) = new HttpHostWrapper(this, host)
@@ -252,4 +270,10 @@ object Http {
         new BasicNameValuePair(k, v) }).toList)
   }
 
+  def getContent(result: HttpResult): Option[String] = {
+    result match {
+      case HttpSuccessResult(_, content) => Some(content)
+      case _ => None
+    }
+  }
 }

@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 
 object io {
   val BufferSize = 1024
-  val MaxBufferSize = 16 * 1024 * 1024
+  val MaxBufferSize = 1024 * 1024
 
   case class FileTooLargeException(message: String) extends IOException(message)
 
@@ -85,6 +85,8 @@ object io {
       in.close()
       buffer
     }
+
+    def readString: String = new String(read, "UTF-8")
   }
 
   implicit class UsbDeviceConnectionExt(val udc: UsbDeviceConnection) extends AnyVal {

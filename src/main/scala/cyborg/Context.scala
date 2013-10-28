@@ -9,6 +9,11 @@ import cyborg.Intent._
 import cyborg.Log._
 
 object Context {
+  val ModePrivate = android.content.Context.MODE_PRIVATE
+  val ModeWorldReadable = android.content.Context.MODE_WORLD_READABLE
+  val ModeWorldWritable = android.content.Context.MODE_WORLD_WRITEABLE
+  val ModeMultiProcess = android.content.Context.MODE_MULTI_PROCESS
+
   implicit def android2cyborgContext(context: android.content.Context) = new Context(context)
   implicit def cyborg2androidContext(context: Context) = context.c
 

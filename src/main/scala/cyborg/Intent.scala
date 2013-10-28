@@ -1,27 +1,27 @@
 package cyborg
 
 import cyborg.Context._
-import android.content.Intent
+import android.content.{Intent => AIntent}
 
 object Intent {
   trait ExtraProp[T] {
-    def get(intent: android.content.Intent, key: String): Option[T]
-    def set(intent: android.content.Intent, key: String, value: T)
+    def get(intent: AIntent, key: String): Option[T]
+    def set(intent: AIntent, key: String, value: T)
   }
   implicit val stringExtraProp = new ExtraProp[String] {
-    def get(intent: Intent, key: String): Option[String] =
+    def get(intent: AIntent, key: String): Option[String] =
       for (extras <- intent.extras; value <- Option(extras.getString(key))) yield value
-    def set(intent: Intent, key: String, value: String): Unit =
+    def set(intent: AIntent, key: String, value: String): Unit =
       for (extras <- intent.extras) extras.putString(key, value)
   }
   implicit val intExtraProp = new ExtraProp[Int] {
-    def get(intent: Intent, key: String): Option[Int] =
+    def get(intent: AIntent, key: String): Option[Int] =
       for (extras <- intent.extras; value <- Option(extras.getInt(key))) yield value
-    def set(intent: Intent, key: String, value: Int): Unit =
+    def set(intent: AIntent, key: String, value: Int): Unit =
       for (extras <- intent.extras) extras.putInt(key, value)
   }
 
-  implicit class IntentExt(val self: android.content.Intent) /* extends AnyVal */ { // Nested class not allowed
+  implicit class IntentExt(val self: AIntent) /* extends AnyVal */ { // Nested class not allowed
     def start(implicit activity: Activity) { activity.startActivity(self) }
 
     def startForResult(requestCode: Int)(implicit activity: Activity) {
@@ -58,7 +58,7 @@ object Intent {
     case class UnknownExtraTypeException(name: String, value: Any)
       extends Exception(s"Unknown extra type: $name -> ${value.toString}")
 
-    def apply() = new android.content.Intent()
-    def apply[A](implicit context: Context, m: Manifest[A]) = new android.content.Intent(context, /* m.runtimeClass*/ m.erasure)
+    def apply() = new AIntent()
+    def apply[A](implicit context: Context, m: Manifest[A]) = new AIntent(context, /* m.runtimeClass*/ m.erasure)
   }
 }

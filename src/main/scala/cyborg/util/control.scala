@@ -21,6 +21,8 @@ object control {
     failed
   }
 
+  def tryElse[T](f: => T)(e: Exception => T) = handling(classOf[Exception])
+
   case class NotImplemented(message: String = "Not implemented") extends Exception(message)
   case class BreakException() extends Exception
 }
