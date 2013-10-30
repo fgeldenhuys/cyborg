@@ -31,6 +31,7 @@ object numbers {
     implicit class StringNumberConversionsCyborgExt(val string: String) extends AnyVal {
       def toIntElse(d: Int) = numberFormatExceptionHandler.opt(string.toInt).getOrElse(d)
       def toShortElse(s: Short) = numberFormatExceptionHandler.opt(string.toShort).getOrElse(s)
+      def toLongElse(l: Long) = numberFormatExceptionHandler.opt(string.toLong).getOrElse(l)
       def isInt = numberFormatExceptionHandler opt {string.toInt; true} getOrElse false
       def toDoubleOption = numberFormatExceptionHandler opt { string.toDouble }
     }
