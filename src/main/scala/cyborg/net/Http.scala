@@ -90,7 +90,7 @@ trait Http {
               p success SimpleHttpResult(-1, message)
           }
         case e: IOException =>
-          $d(s"IOException caught for '$url'")
+          $d(s"IOException caught for '$url': $e")
           execute {
             val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode

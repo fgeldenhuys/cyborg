@@ -2,14 +2,17 @@ package cyborg.net
 
 import java.net.URL
 import javax.net.ssl._
-import java.security.KeyStore
+import java.security.{GeneralSecurityException, KeyStore}
 import cyborg.Context._
 import org.apache.http.conn.ssl.AllowAllHostnameVerifier
 import java.security.cert.{CertificateFactory, X509Certificate}
 import cyborg.Log._
+import cyborg.util.binary._
 
 object HttpSecure extends Http {
   import Http._
+
+  case class WrongCertificateAuthority() extends GeneralSecurityException("Wrong certificate authority")
 
   protected def createConnection(url: String)(implicit params: HttpParameters): HttpsURLConnection = {
     val http = new URL(url).openConnection.asInstanceOf[HttpsURLConnection]
@@ -47,17 +50,33 @@ object HttpSecure extends Http {
       def getAcceptedIssuers: Array[X509Certificate] = null
       def checkClientTrusted(certs: Array[X509Certificate], authType: String) {}
       def checkServerTrusted(certs: Array[X509Certificate], authType: String) {
-        /*val in = context.resources.openRawResource(pemResource)
+        val in = context.resources.openRawResource(pemResource)
         val cf = CertificateFactory.getInstance("X.509")
         val ca = cf.generateCertificate(in).asInstanceOf[X509Certificate]
         in.close()
-        $d(s"${certs.size} to verify")
+        val knownPK = ca.getPublicKey.getEncoded
+        //$d(s"${certs.size} to verify")
         for (cert <- certs) {
-          $d(s"Verifying this from server: $cert")
-          $d(s"Against this known certificate: $ca")
-          cert.verify(ca.getPublicKey)
+          //$d(s"Verifying this from server: $cert")
+          val serverPK = cert.getPublicKey.getEncoded
+          //$d("Server's PK: " + serverPK.base64)
+          //$d(s"Against this known certificate: $ca")
+          //$d("   Known PK: " + knownPK.base64)
+          if (!(serverPK sameBytesAs knownPK)) {
+            $w("Server PK does not match known PK!")
+            throw WrongCertificateAuthority()
+          }
+          //else
+          //  $d("Server PK == Known PK. Everything is peachy")
+          /*try {
+            cert.verify(ca.getPublicKey)
+          }
+          catch {
+            case e: Exception =>
+              $d("verify: " + e.toString)
+              throw e
+          }*/
         }
-        $d("verified")*/
       }
     }
   }
