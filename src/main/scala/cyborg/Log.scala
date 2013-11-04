@@ -21,16 +21,16 @@ trait Log extends LogBase {
   def $e(message: => String) { Log.$e(message, localTag) }
 }
 
-object Log {
+object Log extends LogBase {
   var globalTag = "cyborg"
   var showDebugInfo = true
   val TimeFormat = new SimpleDateFormat("yyMMdd.HHmmss.SSS")
 
-  def debugInfo: String =
+  def debugInfo(drop: Int = 0): String =
     if (showDebugInfo) {
       val time = TimeFormat.format(new Date())
       val st = new Throwable().getStackTrace
-      st.find { ste =>
+      val i = st.indexWhere { ste =>
         val fn = ste.getFileName
         val cn = ste.getClassName
         val mn = ste.getMethodName
@@ -39,7 +39,9 @@ object Log {
           fn != "Log.scala" &&
           fn != "Log.java" &&
           !mn.startsWith("$")
-      } map { ste =>
+      } + drop
+      if (st.isDefinedAt(i)) {
+        val ste = st(i)
         val fn = ste.getFileName
         val cn = ste.getClassName
         val mn = ste.getMethodName
@@ -65,22 +67,32 @@ object Log {
           }
           else None
         context map ( str => s"$time [$str]" ) getOrElse time
-      } getOrElse time
+      } else time
     }
     else ""
 
   def makeTag(localTag: Option[String]) = localTag.map(globalTag + "-" + _).orElse(Some(globalTag)).get
-  def makeMessage(message: String) = debugInfo + " " + message
+  def makeMessage(message: String, discard: Int = 0) = debugInfo(discard) + " " + message
 
-  def $d(message: => String, tag: Option[String] = None) { L.d(makeTag(tag), makeMessage(message)) }
-  def $i(message: => String, tag: Option[String] = None) { L.i(makeTag(tag), makeMessage(message)) }
-  def $w(message: => String, tag: Option[String] = None) { L.w(makeTag(tag), makeMessage(message)) }
-  def $e(message: => String, tag: Option[String] = None) { L.e(makeTag(tag), makeMessage(message)) }
+  def $d(message: => String) { $d(message, None) }
+  def $i(message: => String) { $i(message, None) }
+  def $w(message: => String) { $w(message, None) }
+  def $e(message: => String) { $e(message, None) }
+
+  def $d(message: => String, tag: Option[String]) { L.d(makeTag(tag), makeMessage(message)) }
+  def $i(message: => String, tag: Option[String]) { L.i(makeTag(tag), makeMessage(message)) }
+  def $w(message: => String, tag: Option[String]) { L.w(makeTag(tag), makeMessage(message)) }
+  def $e(message: => String, tag: Option[String]) { L.e(makeTag(tag), makeMessage(message)) }
 
   def $d(message: => String, tag: String) { L.d(makeTag(Some(tag)), makeMessage(message)) }
   def $i(message: => String, tag: String) { L.i(makeTag(Some(tag)), makeMessage(message)) }
   def $w(message: => String, tag: String) { L.w(makeTag(Some(tag)), makeMessage(message)) }
   def $e(message: => String, tag: String) { L.e(makeTag(Some(tag)), makeMessage(message)) }
+
+  def $d(message: => String, drop: Int) { L.d(makeTag(None), makeMessage(message, drop)) }
+  def $i(message: => String, drop: Int) { L.i(makeTag(None), makeMessage(message, drop)) }
+  def $w(message: => String, drop: Int) { L.w(makeTag(None), makeMessage(message, drop)) }
+  def $e(message: => String, drop: Int) { L.e(makeTag(None), makeMessage(message, drop)) }
 
   def java_$d(message: String) { L.d(globalTag, makeMessage(message)) }
   def java_$i(message: String) { L.i(globalTag, makeMessage(message)) }

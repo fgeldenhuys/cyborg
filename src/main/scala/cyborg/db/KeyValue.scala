@@ -38,6 +38,17 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     sqlite.delete(bucket, "key = ?", key)
   }
 
+  def del(keys: Seq[String]) {
+    for (key <- keys) sqlite.delete(bucket, "key = ?", key)
+  }
+
+  def rename(key: String, newKey: String): Boolean = {
+    val rows = sqlite.update(bucket, "key" -> newKey, "key = ?", key)
+    if (rows == 0) false
+    else if (rows == 1) true
+    else throw KeyValueException("Internal error, key/value store might be corrupt")
+  }
+
   // Glob delete
   def findAndDel(glob: String) {
     sqlite.delete(bucket, "key GLOB ?", glob)

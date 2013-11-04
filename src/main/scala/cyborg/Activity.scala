@@ -1,11 +1,15 @@
 package cyborg
 
-import Context._
-import android.view.View
-import android.view.inputmethod.InputMethodManager
-import android.widget.Toast
+import android.app.AlertDialog
 import android.content.res.Configuration
+import android.content.{BroadcastReceiver, DialogInterface}
+import android.view.inputmethod.InputMethodManager
+import android.view.View
+import android.widget.{EditText, Toast}
+import Context._
 import cyborg.util.events.Observable
+import scala.concurrent._
+import scala.collection.mutable
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -35,6 +39,7 @@ class Activity extends android.app.Activity {
     inputManager.hideSoftInputFromWindow(getCurrentFocus.getWindowToken,
       InputMethodManager.HIDE_NOT_ALWAYS)
   }
+
 }
 
 object Activity {
@@ -45,6 +50,23 @@ object Activity {
     activity.runOnUiThread(new Runnable {
       def run() { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
     })
+  }
+
+  def prompt(title: String, message: String)(implicit context: Context): Future[Option[String]] = {
+    val p = promise[Option[String]]()
+    val alert = new AlertDialog.Builder(context)
+    alert.setTitle(title)
+    alert.setMessage(message)
+    val input = new EditText(context)
+    alert.setView(input)
+    alert.setPositiveButton("Ok", new DialogInterface.OnClickListener {
+      def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
+    })
+    alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
+      def onClick(dialog: DialogInterface, button: Int) { p success None }
+    })
+    alert.show()
+    p.future
   }
 
   implicit class ActivityObservableExtensions[T](val obs: Observable[T, Any]) extends AnyVal {
