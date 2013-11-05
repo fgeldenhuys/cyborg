@@ -31,7 +31,7 @@ object HttpSecure extends Http {
     val in = context.resources.openRawResource(keyStoreRes)
     keyStore.load(in, password.toCharArray)
     in.close()
-    val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm)
+    val tmf = TrustManagerFactory.getInstance("X509")
     tmf.init(keyStore)
     val ssl = SSLContext.getInstance("TLS")
     ssl.init(null, tmf.getTrustManagers, null)
