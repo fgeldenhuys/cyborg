@@ -46,10 +46,14 @@ object Activity {
   val ResultOk = android.app.Activity.RESULT_OK
   val ResultCanceled = android.app.Activity.RESULT_CANCELED
 
-  def toast(message: String)(implicit activity: android.app.Activity) {
-    activity.runOnUiThread(new Runnable {
-      def run() { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
-    })
+  sealed trait ToastDuration { def value: Int }
+  val ToastLong = new ToastDuration { def value = Toast.LENGTH_LONG }
+  val ToastShort = new ToastDuration { def value: Int = Toast.LENGTH_SHORT }
+
+  def toast(message: String, duration: ToastDuration = ToastShort)(implicit activity: android.app.Activity): Toast = {
+    val t = Toast.makeText(activity, message, duration.value)
+    activity.runOnUiThread(new Runnable { def run() { t.show() } })
+    t
   }
 
   def prompt(title: String, message: String)(implicit context: Context): Future[Option[String]] = {

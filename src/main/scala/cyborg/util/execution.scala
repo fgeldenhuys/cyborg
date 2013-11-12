@@ -4,11 +4,13 @@ import cyborg.Context._
 import android.os.Handler
 import scala.concurrent._
 import scala.concurrent.duration._
-import java.util.concurrent.{ScheduledThreadPoolExecutor, ScheduledFuture, TimeUnit, ScheduledExecutorService}
+import java.util.concurrent.{ScheduledThreadPoolExecutor, ScheduledFuture, TimeUnit}
 import cyborg.Log._
 
 object execution {
   implicit def fun2runnable(f: => Any): Runnable = new Runnable { def run() { f } }
+
+  def systemTime: Long = System.currentTimeMillis()
 
   def runnable(f: => Unit): Runnable =
     new Runnable {
@@ -30,12 +32,18 @@ object execution {
 
   class ExecuteWrapper[T](val fun: () => T,
                           val afterwardsFun: Option[() => Any] = None) {
+
+    def andAfterwards(f: => Any): ExecuteWrapper[T] = {
+      new ExecuteWrapper[T](fun, Some(() => f))
+    }
+
     def now: T = {
       val result = fun()
       afterwardsFun.map(_())
       result
     }
 
+    // Runs original function, and tries to kill it if it runs longer than d and returns.
     def within(d: Duration)(implicit sec: ScheduledExecutionContext): Future[T] = {
       val p = promise[T]
       var scheduledCancel: Option[ScheduledFuture[_]] = None
@@ -66,17 +74,41 @@ object execution {
       p.future
     }
 
+    // Run immediately and then repeatedly with delay of d in between executions. The result is lost.
     def repeatedWithDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): ScheduledFuture[_] = {
       sec.scheduleWithFixedDelay({
         fun()
       }, 0, d.toMillis, TimeUnit.MILLISECONDS)
     }
 
-    def andAfterwards(f: => Any): ExecuteWrapper[T] = {
-      new ExecuteWrapper[T](fun, Some(() => f))
+    // Returns a confirm function. If confirm is called before the timeout the original function runs and
+    // returns Some(result). If it is called after timeout, doesn't run and returns None.
+    def ifConfirmedWithin(d: Duration)(implicit sec: ScheduledExecutionContext): ConfirmExecution[T] = {
+      new ConfirmExecution[T](d, this)
     }
   }
 
   def execute[T](f: => T) = new ExecuteWrapper[T](() => f)
   implicit def implicitExecuteNow[T](ew: ExecuteWrapper[T]): T = ew.now
+
+  class ConfirmExecution[T](d: Duration, val wrapped: ExecuteWrapper[T]) {
+    var timeout = systemTime + d.toMillis
+
+    def confirm: Option[T] = {
+      val current = systemTime
+      if (current <= timeout) {
+        val result = wrapped.fun()
+        wrapped.afterwardsFun.map(_())
+        Some(result)
+      }
+      else
+        None
+    }
+
+    def confirmOrElse[A](f: => A) = confirm getOrElse f
+
+    def reset(d: Duration) {
+      timeout = systemTime + d.toMillis
+    }
+  }
 }
