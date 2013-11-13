@@ -15,10 +15,10 @@ object Adapters {
   def makeAdapter[A](source: A)(implicit adapterMaker: AdapterMaker[A]): BaseAdapter =
     adapterMaker(source)
 
-  def makeAdapterMapping[A](vr: ViewResource[TextView])
-                           (implicit s: Show[A], context: Context) = {
-    new AdapterMaker[List[A]] {
-      def apply(source: List[A]) = new BaseAdapter {
+  def makeSeqAdapterMapping[A](vr: ViewResource[TextView])
+                              (implicit s: Show[A], context: Context) = {
+    new AdapterMaker[Seq[A]] {
+      def apply(source: Seq[A]) = new BaseAdapter {
         def getCount: Int = source.size
         def getItem(i: Int): AnyRef = source(i).asInstanceOf[AnyRef] //yuck
         def getItemId(id: Int): Long = id
