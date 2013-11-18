@@ -26,25 +26,36 @@ object Adapters {
   def makeAdapter[A](source: A)(implicit adapterMaker: AdapterMaker[A]): BaseAdapter =
     adapterMaker(source)
 
-  def makeListAdapterMapping[A](vr: ViewResource[TextView])
-                              (implicit s: Show[A], context: Context) = {
+  def makeListAdapter[A](f: (A, View, ViewGroup) => View)
+                        (implicit context: Context) =
+    new ListAdapterMaker[A] {
+      def makeView(item: A, convert: View, parent: ViewGroup): View = f(item, convert, parent)
+    }
+
+  def makeListAdapterFromShow[A, TV <: TextView](vr: ViewResource[TV])
+                                                (implicit s: Show[A], context: Context) =
     new ListAdapterMaker[A] {
       def makeView(item: A, convert: View, parent: ViewGroup): View = {
-        val view =
-          if (convert != null) convert.asInstanceOf[TextView]
+        val view: TV =
+          if (convert != null) convert.asInstanceOf[TV]
           else vr.inflate(parent)(context)
         view.text = item.shows
         view
       }
     }
-  }
 
-  def makeListAdapterMapping[A](f: (A, View, ViewGroup) => View)
-                               (implicit context: Context) = {
+  def makeListAdapterFromTextView[A, TV <: TextView](vr: ViewResource[TV])
+                                                    (f: (A) => String)
+                                                    (implicit context: Context) =
     new ListAdapterMaker[A] {
-      def makeView(item: A, convert: View, parent: ViewGroup): View = f(item, convert, parent)
+      def makeView(item: A, convert: View, parent: ViewGroup): View = {
+        val view: TV =
+          if (convert != null) convert.asInstanceOf[TV]
+          else vr.inflate(parent)(context)
+        view.text = f(item)
+        view
+      }
     }
-  }
 
   val emptyAdapter = new BaseAdapter {
     def getCount: Int = 0

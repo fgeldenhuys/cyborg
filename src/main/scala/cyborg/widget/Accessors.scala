@@ -2,7 +2,7 @@ package cyborg.widget
 
 import cyborg.util.NotImplemented
 import android.view.View
-import android.widget.ListAdapter
+import android.widget.{SpinnerAdapter, ListAdapter}
 
 object Accessors {
   implicit class ViewAccessors(val v: android.view.View) extends AnyVal {
@@ -14,11 +14,30 @@ object Accessors {
     def focus() { b.setFocusableInTouchMode(true); b.requestFocus() }
   }
 
+  implicit class GridViewAccessors(val gv: android.widget.GridView) extends AnyVal {
+    def numColumns = gv.getNumColumns
+    def numColumns_=(c: Int) { gv.setNumColumns(c) }
+  }
+
+  implicit class ListViewAccessors(val v: android.widget.ListView) extends AnyVal {
+    def adapter: ListAdapter = v.getAdapter
+    def adapter_=(a: ListAdapter) { v.setAdapter(a) }
+    def selected: Int = v.getSelectedItemPosition
+    def selected_=(i: Int) { v.setSelection(i) }
+  }
+
   implicit class ProgressBarAccessors(val pb: android.widget.ProgressBar) extends AnyVal {
     def max: Int = pb.getMax
     def max_=(m: Int) { pb.setMax(m) }
     def progress: Int = pb.getProgress
     def progress_=(p: Int) { pb.setProgress(p) }
+  }
+
+  implicit class SpinnerAccessors(val v: android.widget.Spinner) extends AnyVal {
+    def adapter: SpinnerAdapter = v.getAdapter
+    def adapter_=(a: SpinnerAdapter) { v.setAdapter(a) }
+    def selected: Int = v.getSelectedItemPosition
+    def selected_=(i: Int) { v.setSelection(i) }
   }
 
   implicit class TextViewAccessors(val tv: android.widget.TextView) extends AnyVal {
@@ -36,13 +55,4 @@ object Accessors {
     def textSize_=(s: Double) { tv.setTextSize(s.toFloat) }
   }
 
-  implicit class ListViewAccessors(val lv: android.widget.ListView) extends AnyVal {
-    def adapter: ListAdapter = lv.getAdapter
-    def adapter_=(a: ListAdapter) { lv.setAdapter(a) }
-  }
-
-  implicit class GridViewAccessors(val gv: android.widget.GridView) extends AnyVal {
-    def numColumns = gv.getNumColumns
-    def numColumns_=(c: Int) { gv.setNumColumns(c) }
-  }
 }
