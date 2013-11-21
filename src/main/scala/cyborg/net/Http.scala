@@ -6,8 +6,9 @@ import cyborg.net.Http.SimpleHttpResult
 import cyborg.util.binary._
 import cyborg.util.execution._
 import cyborg.util.io._
+import cyborg.util.control._
 import java.io._
-import java.net.{URLEncoder, CookieHandler, CookieManager, HttpURLConnection}
+import java.net.{CookieHandler, CookieManager, HttpURLConnection}
 import javax.net.ssl.SSLSocketFactory
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.utils.URLEncodedUtils
@@ -167,6 +168,47 @@ trait Http {
     }
   }
 
+  def getFileM(url: String, outputFile: String, data: Map[String, String] = Map.empty)
+              (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+              : Monitor[HttpResult, Bytes] = {
+    import cyborg.util.io._
+    val m = monitor[HttpResult, Bytes]
+    future {
+      val fullUrl = url + "?" + makeGetParams(data)
+      $d(s"GET FILE '$fullUrl'", 1)
+      val http = createConnection(fullUrl)
+      try {
+        val in = http.getInputStream
+        val code = http.getResponseCode
+        if (code / 100 == 2) {
+          val file = new java.io.File(outputFile)
+          file.getCanonicalFile.getParentFile.mkdirs()
+          file.createNewFile()
+          val streamMonitor = inStream2NewFileM(in, file)
+          m.track(streamMonitor) { (size: Int) =>
+            $d(s"Downloaded '${file.getAbsolutePath}' of size $size")
+            SimpleHttpResult(code, file.getAbsolutePath)
+          }
+        }
+        else
+          m success SimpleHttpResult(code, read(http.getErrorStream))
+      }
+      catch {
+        case e: FileNotFoundException =>
+          val errorContent = read(http.getErrorStream)
+          val responseCode = http.getResponseCode
+          $w(s"$responseCode $e for '$fullUrl'")
+          m failure SimpleHttpResult(responseCode, errorContent)
+        case e: IOException =>
+          val errorContent = read(http.getErrorStream)
+          val responseCode = http.getResponseCode
+          $w(s"$responseCode $e for '$fullUrl'")
+          m failure SimpleHttpResult(responseCode, errorContent)
+      }
+    }
+    m
+  }
+
   def getBytes(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
   : Future[Array[Byte]] = future {
@@ -229,7 +271,7 @@ object Http {
     socketFactory = None
   )
 
-  trait HttpResult {
+  trait HttpResult extends Throwable {
     def code: Int
     def content: String
 

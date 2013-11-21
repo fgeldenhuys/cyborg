@@ -2,9 +2,12 @@ package cyborg.util
 
 import android.hardware.usb.{UsbEndpoint, UsbDeviceConnection}
 import cyborg.util.binary._
+import cyborg.util.control._
 import java.io._
-import scala.concurrent.duration.Duration
 import java.nio.ByteBuffer
+import scala.concurrent._
+import scala.concurrent.duration.Duration
+import cyborg.util.execution.ScheduledExecutionContext
 
 object io {
   val BufferSize = 1024
@@ -40,9 +43,34 @@ object io {
     total
   }
 
+  def inStream2outStreamM(in: InputStream, out: OutputStream)
+                         (implicit sec: ScheduledExecutionContext): Monitor[Int, Bytes] = {
+    val m = monitor[Int, Bytes]
+    future {
+      val buf = new Array[Byte](BufferSize)
+      var total = 0
+      var bytesRead = in.read(buf, 0, BufferSize)
+      while(bytesRead != -1 && !m.isCompleted) {
+        total += bytesRead
+        out.write(buf, 0, bytesRead)
+        m.reportProgress(Bytes(total))
+        bytesRead = in.read(buf, 0, BufferSize)
+      }
+      out.flush()
+      if (!m.isCompleted) m success total
+    }
+    m
+  }
+
   def inStream2NewFile(in: InputStream, file: File): Int = {
     val out = new BufferedOutputStream(new FileOutputStream(file, false))
     inStream2outStream(in, out)
+  }
+
+  def inStream2NewFileM(in: InputStream, file: File)
+                       (implicit sec: ScheduledExecutionContext): Monitor[Int, Bytes] = {
+    val out = new BufferedOutputStream(new FileOutputStream(file, false))
+    inStream2outStreamM(in, out)
   }
 
   implicit class OutputStreamCyborgExt(val out: OutputStream) extends AnyVal {
