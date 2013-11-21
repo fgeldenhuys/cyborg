@@ -5,6 +5,7 @@ import scala.collection.JavaConversions._
 
 object Preferences {
   case class WrongPrefTypeException(message: String) extends Exception(message)
+  case class PrefNotFoundException(message: String) extends Exception(message)
 
   case class Preferences(section: String) {
     private def prefs(implicit context: Context) =
@@ -32,17 +33,39 @@ object Preferences {
     def ? (key: String)(implicit prop: PreferencesProp[Boolean], context: Context): Boolean =
       apply[Boolean](key) getOrElse false
 
-    def addString(key: String, value: String)(implicit context: Context) {
-      if (prefs.contains(key)) {
-        val set = prefs.getStringSet(key, null)
+    def addString(key: String, value: String)(implicit context: Context): Set[String] = {
+      val p = prefs
+      if (p.contains(key)) {
+        val set = p.getStringSet(key, null)
         if (set == null) throw WrongPrefTypeException("Expected string set")
         val newSet = set + value
-        prefs.edit().putStringSet(key, newSet).apply()
+        p.edit().putStringSet(key, newSet).apply()
+        newSet.toSet
       }
       else {
         val set = Set[String](value)
-        prefs.edit().putStringSet(key, set).apply()
+        p.edit().putStringSet(key, set).apply()
+        set
       }
+    }
+
+    def removeString(key: String, value: String)(implicit context: Context): Set[String] = {
+      val p = prefs
+      if (p.contains(key)) {
+        val set = p.getStringSet(key, null)
+        if (set == null) throw WrongPrefTypeException("Expected string set")
+        val newSet = set - value
+        p.edit().putStringSet(key, newSet).apply()
+        newSet.toSet
+      }
+      else throw PrefNotFoundException("String set not found")
+    }
+
+    def increment(key: String)(implicit context: Context): Long = {
+      val p = prefs
+      val result = p.getLong(key, 0) + 1
+      p.edit().putLong(key, result).apply()
+      result
     }
 
     def raw(implicit context: Context) = context.getSharedPreferences(section, Context.ModeMultiProcess)
@@ -60,8 +83,9 @@ object Preferences {
 
   implicit val intProp = new PreferencesProp[Int] {
     def get(section: String, key: String)(implicit context: Context): Option[Int] = {
-      if (prefs(section).contains(key))
-        Some(prefs(section).getInt(key, 0))
+      val p = prefs(section)
+      if (p.contains(key))
+        Some(p.getInt(key, 0))
       else
         None
     }
@@ -81,8 +105,9 @@ object Preferences {
 
   implicit val booleanProp = new PreferencesProp[Boolean] {
     def get(section: String, key: String)(implicit context: Context): Option[Boolean] = {
-      if (prefs(section).contains(key))
-        Some(prefs(section).getBoolean(key, false))
+      val p = prefs(section)
+      if (p.contains(key))
+        Some(p.getBoolean(key, false))
       else
         None
     }
@@ -93,8 +118,9 @@ object Preferences {
 
   implicit val longProp = new PreferencesProp[Long] {
     def get(section: String, key: String)(implicit context: Context): Option[Long] = {
-      if (prefs(section).contains(key))
-        Some(prefs(section).getLong(key, 0))
+      val p = prefs(section)
+      if (p.contains(key))
+        Some(p.getLong(key, 0))
       else
         None
     }
@@ -105,8 +131,9 @@ object Preferences {
 
   implicit val stringSetProp = new PreferencesProp[Set[String]] {
     def get(section: String, key: String)(implicit context: Context): Option[Set[String]] = {
-      if (prefs(section).contains(key))
-        Some(prefs(section).getStringSet(key, null).toSet)
+      val p = prefs(section)
+      if (p.contains(key))
+        Some(p.getStringSet(key, null).toSet)
       else None
     }
     def set(section: String, key: String, value: Set[String])(implicit context: Context) {
