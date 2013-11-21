@@ -48,6 +48,7 @@ object Intent {
         value match {
           case string: String => self.putExtra(name, string)
           case int: Int => self.putExtra(name, int)
+          case long: Long => self.putExtra(name, long)
           case double: Double => self.putExtra(name, double)
           case boolean: Boolean => self.putExtra(name, boolean)
           case byteArray: Array[Byte] => self.putExtra(name, byteArray)
