@@ -1,9 +1,11 @@
 package cyborg.graphics
 
-import cyborg.Log._
 import cyborg.util.numbers._
 
 object Color {
+  case class Color(value: Int)
+  implicit def color2int(c: Color): Int = c.value
+
   case class InvalidColorStringException(string: String) extends Exception(s"Invalid color string '$string'")
 
   implicit class ColorStringContext(val sc: StringContext) extends AnyVal {

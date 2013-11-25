@@ -4,6 +4,7 @@ import android.util.AttributeSet
 import cyborg.Context.Context
 import android.content.res.TypedArray
 import android.graphics.drawable.Drawable
+import cyborg.graphics.Color._
 
 object StyledAttributeSetReader {
 
@@ -18,6 +19,11 @@ object StyledAttributeSetReader {
 
   implicit val stringAttributeSetReader = new AttributeSetReader[String] {
     def apply(a: TypedArray, index: Int): Option[String] = Option(a.getString(index))
+  }
+
+  implicit val colorAttributeSetReader = new AttributeSetReader[Color] {
+    def apply(a: TypedArray, index: Int): Option[Color] =
+      if (a.hasValue(index)) Option(Color(a.getColor(index, 0))) else None
   }
 
   implicit val drawableAttributeSetReader = new AttributeSetReader[Drawable] {

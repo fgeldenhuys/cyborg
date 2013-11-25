@@ -35,7 +35,8 @@ object control {
   class Monitor[A,P](
     val promise: Promise[A] = scala.concurrent.promise[A](),
     var maxProgress: Option[P] = None,
-    val progressObservers: mutable.ArrayBuffer[(P) => Any] = mutable.ArrayBuffer.empty[(P) => Any]
+    val progressObservers: mutable.ArrayBuffer[(P) => Any] = mutable.ArrayBuffer.empty[(P) => Any],
+    val maxProgressObservers: mutable.ArrayBuffer[(P) => Any] = mutable.ArrayBuffer.empty[(P) => Any]
   ) {
     import Monitor._
 
@@ -52,11 +53,17 @@ object control {
 
     def withMaxProgress(max: P) = {
       maxProgress = Some(max)
+      maxProgressObservers.map(_(max))
       this
     }
 
     def onProgress(f: (P) => Any) = {
       progressObservers += f
+      this
+    }
+
+    def onMaxProgress(f: (P) => Any) = {
+      maxProgressObservers += f
       this
     }
 

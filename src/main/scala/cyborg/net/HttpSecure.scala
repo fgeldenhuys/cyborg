@@ -1,28 +1,32 @@
 package cyborg.net
 
-import java.net.URL
-import javax.net.ssl._
-import java.security.{GeneralSecurityException, KeyStore}
 import cyborg.Context._
-import org.apache.http.conn.ssl.AllowAllHostnameVerifier
-import java.security.cert.{CertificateFactory, X509Certificate}
 import cyborg.Log._
 import cyborg.util.binary._
+import java.net.URL
+import java.security.cert.{CertificateFactory, X509Certificate}
+import java.security.{GeneralSecurityException, KeyStore}
+import javax.net.ssl._
+import org.apache.http.conn.ssl.AllowAllHostnameVerifier
+import scala.util.control.Exception._
 
 object HttpSecure extends Http {
   import Http._
 
   case class WrongCertificateAuthority() extends GeneralSecurityException("Wrong certificate authority")
 
-  protected def createConnection(url: String)(implicit params: HttpParameters): HttpsURLConnection = {
-    val http = new URL(url).openConnection.asInstanceOf[HttpsURLConnection]
-    http.setRequestProperty("Accept-Encoding", "identity")
-    http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
-    http.setReadTimeout(params.readTimeout.toMillis.toInt)
-    if (params.chunked) http.setChunkedStreamingMode(0)
-    http.setHostnameVerifier(new AllowAllHostnameVerifier())
-    params.socketFactory.map(http setSSLSocketFactory _)
-    http
+  protected def createConnection(url: String)(implicit params: HttpParameters): Either[Throwable, HttpsURLConnection] = {
+    System.setProperty("http.keepAlive", "false")
+    catching(classOf[Exception]) either {
+      val http = new URL(url).openConnection.asInstanceOf[HttpsURLConnection]
+      http.setRequestProperty("Accept-Encoding", "identity")
+      http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
+      http.setReadTimeout(params.readTimeout.toMillis.toInt)
+      if (params.chunked) http.setChunkedStreamingMode(0)
+      http.setHostnameVerifier(new AllowAllHostnameVerifier())
+      params.socketFactory.map(http setSSLSocketFactory _)
+      http
+    }
   }
 
   def makeSslSocketFactoryFromKeyStore(keyStoreRes: Int, password: String)

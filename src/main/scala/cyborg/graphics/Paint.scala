@@ -3,9 +3,10 @@ package cyborg.graphics
 object Paint {
   type Style = android.graphics.Paint.Style
 
+  val AntiAliasFlag = android.graphics.Paint.ANTI_ALIAS_FLAG
   val Fill = android.graphics.Paint.Style.FILL
-  val Stroke = android.graphics.Paint.Style.STROKE
   val FillAndStroke = android.graphics.Paint.Style.FILL_AND_STROKE
+  val Stroke = android.graphics.Paint.Style.STROKE
 
   lazy val SolidBlack = Paint(color = Color.Black)
   lazy val LineBlack = Paint(color = Color.Black, style = Stroke, antiAlias = true)
