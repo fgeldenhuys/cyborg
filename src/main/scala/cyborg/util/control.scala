@@ -36,7 +36,8 @@ object control {
     val promise: Promise[A] = scala.concurrent.promise[A](),
     var maxProgress: Option[P] = None,
     val progressObservers: mutable.ArrayBuffer[(P) => Any] = mutable.ArrayBuffer.empty[(P) => Any],
-    val maxProgressObservers: mutable.ArrayBuffer[(P) => Any] = mutable.ArrayBuffer.empty[(P) => Any]
+    val maxProgressObservers: mutable.ArrayBuffer[(P) => Any] = mutable.ArrayBuffer.empty[(P) => Any],
+    var tracking: Option[Monitor[_,P]] = None
   ) {
     import Monitor._
 
@@ -48,7 +49,11 @@ object control {
     def success(v: A) = promise success v
 
     def cancel(reason: String) {
-      promise failure Cancelled(reason)
+      tracking map { other =>
+        other.cancel(reason)
+      } getOrElse {
+        promise failure Cancelled(reason)
+      }
     }
 
     def withMaxProgress(max: P) = {
@@ -80,6 +85,7 @@ object control {
     }
 
     def track[B](other: Monitor[B,P])(f: (B) => A)(implicit sec: ScheduledExecutionContext) {
+      tracking = Some(other)
       other.future onComplete {
         case Success(result) => promise success f(result)
         case Failure(t) => promise failure t

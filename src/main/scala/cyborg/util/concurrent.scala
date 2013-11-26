@@ -17,4 +17,8 @@ object concurrent {
   implicit class FutureCyborgExt[T](val f: Future[T]) extends AnyVal {
     def blockOption(max: Duration): Option[T] = Try(Await.result(f, max)).toOption
   }
+
+  implicit class SyncVarCyborgExt[A](val sv: SyncVar[A]) extends AnyVal {
+    def pop(timeout: Long): Option[A] = Try(sv.take(timeout)).toOption
+  }
 }

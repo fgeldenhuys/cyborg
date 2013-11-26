@@ -10,13 +10,9 @@ object HttpPlain extends Http {
     import cyborg.Log._
     System.setProperty("http.keepAlive", "false")
     catching[HttpURLConnection](classOf[Exception]) either {
-      $d("cc")
       val urlObject = new URL(url)
-      $d("urlObject="+urlObject)
       val urlConnection = urlObject.openConnection
-      $d("urlConnection="+urlConnection)
       val http = urlConnection.asInstanceOf[HttpURLConnection]
-      $d("http="+http)
       http.setRequestProperty("Accept-Encoding", "identity")
       http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
       http.setReadTimeout(params.readTimeout.toMillis.toInt)

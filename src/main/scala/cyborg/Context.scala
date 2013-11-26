@@ -33,21 +33,21 @@ object Context {
     def broadcast(action: String, extras: (String, Any)*) {
       val intent = new android.content.Intent(action)
       intent.putExtras(extras:_*)
-      $i(s"BROADCAST '$action' $intent", 1)
+      //$i(s"BROADCAST '$action' $intent", 1)
       c.sendBroadcast(intent)
     }
 
     def localBroadcast(action: String, extras: (String, Any)*) {
       val intent = new android.content.Intent(action)
       intent.putExtras(extras:_*)
-      $i(s"BROADCAST local '$action' $intent", 1)
+      //$i(s"BROADCAST local '$action' $intent", 1)
       LocalBroadcastManager.getInstance(c).sendBroadcast(intent)
     }
 
     def broadcastReceiver(action: String)(f: (android.content.Intent) => Any): CyborgWrappedBroadcastReceiver = {
       val receiver = new BroadcastReceiver {
         def onReceive(context: android.content.Context, intent: android.content.Intent) {
-          $d("RECEIVED " + intent.getAction)
+          //$d("RECEIVED " + intent.getAction)
           f(intent)
         }
       }
@@ -57,7 +57,7 @@ object Context {
     def localBroadcastReceiver(action: String)(f: (android.content.Intent) => Any): CyborgWrappedBroadcastReceiver = {
       val receiver = new BroadcastReceiver {
         def onReceive(context: android.content.Context, intent: android.content.Intent) {
-          $d("RECEIVED local " + intent.getAction)
+          //$d("RECEIVED local " + intent.getAction)
           f(intent)
         }
       }

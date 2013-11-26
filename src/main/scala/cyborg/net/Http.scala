@@ -192,11 +192,8 @@ trait Http {
         case Left(t) => m failure t
         case Right(http) =>
           try {
-            $d("try")
             val in = http.getInputStream
-            $d("got stream")
             val code = http.getResponseCode
-            $d("code="+code)
             val length = http.getContentLength
             if (length > -1) m withMaxProgress Bytes(length)
             if (code / 100 == 2) {
