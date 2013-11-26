@@ -37,6 +37,15 @@ object numbers {
     }
   }
 
+  object BooleanNumberConversionsCyborgExt {
+    implicit class BooleanNumberConversionsCyborgExt(val b: Boolean) extends AnyVal {
+      def toInt = if (b) 1 else 0
+    }
+    implicit class IntBooleanConversionsCyborgExt(val i: Int) extends AnyVal {
+      def toBoolean = i != 0
+    }
+  }
+
   private val WhitespaceRegex = "\\s".r
   implicit class HexStringContext(val sc: StringContext) extends AnyVal {
     def hex(args: Any*): Int = {
