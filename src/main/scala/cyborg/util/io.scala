@@ -92,9 +92,19 @@ object io {
       in.read(buffer)
       buffer
     }
+    def bytes(): Array[Byte] = {
+      val out = new ByteArrayOutputStream()
+      inStream2outStream(in, out)
+      out.toByteArray
+    }
     def byte: Byte = bytes(1)(0)
     def int: Int = ByteBuffer.wrap(bytes(4)).getInt
     def string(size: Int): String = new String(bytes(size), "UTF-8") //WARNING: size in bytes, not encoded characters
+    def string: String = {
+      val out = new ByteArrayOutputStream()
+      inStream2outStream(in, out)
+      out.toString("UTF-8")
+    }
     def decString: String = {
       val size = in.int
       val bytes = in.bytes(size)

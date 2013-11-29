@@ -2,7 +2,7 @@ package cyborg.widget
 
 import android.os.SystemClock
 import android.webkit
-import android.webkit.{ConsoleMessage, MimeTypeMap}
+import android.webkit.{DownloadListener, ConsoleMessage, MimeTypeMap}
 import cyborg.Context._
 import cyborg.Log
 import cyborg.net.URIExt._
@@ -16,6 +16,12 @@ import scala.util.control.Exception._
 class WebView()(implicit val context: Context) extends android.webkit.WebView(context) with Log {
   val chromeClient: WebChromeClient = new WebChromeClient
   super.setWebChromeClient(chromeClient)
+
+  setDownloadListener(new DownloadListener {
+    def onDownloadStart(url: String, userAgent: String, contentDisposition: String, mimetype: String, contentLength: Long) {
+      $w(s"DOWNLOAD url=$url mimetype=$mimetype")
+    }
+  })
 
   val webViewBitchHandler = handling(classOf[NullPointerException]) by { (ex) =>
     $d("WebView is being a little bitch again")

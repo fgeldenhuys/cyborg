@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import scala.util.control.Exception._
 import java.io.ByteArrayOutputStream
 import android.util.Base64
+import java.security.MessageDigest
 
 object binary {
   object Bytes {
@@ -53,6 +54,7 @@ object binary {
       else false
     }
     def base64: String = Base64.encodeToString(data, Base64.DEFAULT)
+    def sha1: Array[Byte] = MessageDigest.getInstance("SHA-1").digest(data)
     def toShort: Short = ByteBuffer.wrap(data).getShort
   }
 
