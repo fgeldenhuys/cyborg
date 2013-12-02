@@ -4,8 +4,9 @@ import android.os.SystemClock
 import android.webkit
 import android.webkit.{DownloadListener, ConsoleMessage, MimeTypeMap}
 import cyborg.Context._
-import cyborg.Log
+import cyborg.Log._
 import cyborg.net.URIExt._
+import cyborg.util.control._
 import cyborg.util.execution._
 import cyborg.util.io._
 import java.io.{IOException, ByteArrayOutputStream}
@@ -13,7 +14,7 @@ import java.net.URLDecoder
 import scala.collection.JavaConversions._
 import scala.util.control.Exception._
 
-class WebView()(implicit val context: Context) extends android.webkit.WebView(context) with Log {
+class WebView()(implicit val context: Context) extends android.webkit.WebView(context) {
   val chromeClient: WebChromeClient = new WebChromeClient
   super.setWebChromeClient(chromeClient)
 
@@ -32,12 +33,14 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
   }
 
   def safeLoadUrl(url: String) {
+    WebView.checkUrl(url)
     webViewBitchHandler {
       loadUrl(url)
     }
   }
 
   def safeLoadUrl(url: String, httpHeaders: Map[String, String]) {
+    WebView.checkUrl(url)
     webViewBitchHandler {
       loadUrl(url, httpHeaders)
     }
@@ -97,7 +100,7 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
     }
   }
 
-  class WebChromeClient extends android.webkit.WebChromeClient with Log {
+  class WebChromeClient extends android.webkit.WebChromeClient {
     var lastRunJS: Option[String] = None
     var lastRunTime: Option[Long] = None
 
@@ -145,6 +148,12 @@ object WebView {
     "Pragma" -> "no-cache",
     "Cache-Control" -> "no-cache"
   )
+
+  def checkUrl(url: String) {
+    stackTraceHandler(Nil) {
+      if (URI(url).getHost.isEmpty) $w("Android 4.4 does not like zero length hostnames: " + url)
+    }
+  }
 }
 
 class WebViewClient extends android.webkit.WebViewClient {
