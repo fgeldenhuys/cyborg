@@ -38,7 +38,7 @@ object binary {
     def toBoolean: Boolean = byte != 0.toByte
   }
 
-  implicit class ByteArrayCyborgExt(val data: Array[Byte]) extends AnyVal {
+  implicit class ByteArrayCyborgBinaryExt(val data: Array[Byte]) extends AnyVal {
     def hexString(separator: String) = data.map("%02X" format _).mkString(separator)
     def hexString: String = hexString(" ")
     def sameBytesAs (that: Array[Byte]): Boolean = {

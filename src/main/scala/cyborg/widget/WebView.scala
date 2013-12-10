@@ -13,6 +13,8 @@ import java.io.{IOException, ByteArrayOutputStream}
 import java.net.URLDecoder
 import scala.collection.JavaConversions._
 import scala.util.control.Exception._
+import scalaz._, Scalaz._
+import scala.collection.mutable
 
 class WebView()(implicit val context: Context) extends android.webkit.WebView(context) {
   val chromeClient: WebChromeClient = new WebChromeClient
@@ -51,13 +53,11 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
       $e(s"Exception during runJS: $ex")
       ex.printStackTrace()
     } apply {
-      val script = s"javascript:(function(){$js;}())"
+      val script = s"javascript:(function(){$js;})()"
       chromeClient.lastRunJS = Some(js)
       chromeClient.lastRunTime = Some(SystemClock.uptimeMillis())
-      webViewBitchHandler {
-        runOnMainLooper {
-          safeLoadUrl(script)
-        }
+      runOnMainLooper {
+        safeLoadUrl(script)
       }
     }
   }
@@ -69,14 +69,15 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
   }
 
   def loadJS(filename: String) {
+    $w("This should not be used from Android 4.4 on.")
     catching(classOf[IOException]).opt {
       val in = getContext.getAssets.open(filename)
       val buffer = new ByteArrayOutputStream()
       buffer << "javascript:"
       val bytes = inStream2outStream(in, buffer)
       //$d(s"Loaded $bytes bytes from '$filename'")
+      in.close()
       val string = buffer.toString("UTF-8")
-      //$d(s"Converted to string of ${string.size} characters:")
       chromeClient.lastRunJS = Some(string)
       chromeClient.lastRunTime = Some(SystemClock.uptimeMillis())
       string
@@ -103,6 +104,7 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
   class WebChromeClient extends android.webkit.WebChromeClient {
     var lastRunJS: Option[String] = None
     var lastRunTime: Option[Long] = None
+    var sources: mutable.HashMap[String, List[String]] = mutable.HashMap.empty
 
     override def onConsoleMessage(message: ConsoleMessage): Boolean = {
       val source = if(message.sourceId() == null)
@@ -118,14 +120,19 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
       }
       if (message.messageLevel == ConsoleMessage.MessageLevel.ERROR ||
         message.messageLevel == ConsoleMessage.MessageLevel.WARNING) {
-        for (js <- lastRunJS; time <- lastRunTime) {
-          if (message.sourceId() == null &&
-            message.lineNumber() <= js.lines.size &&
-            math.abs(SystemClock.uptimeMillis() - time) < 1000) {
-            $d("Possibly for this code:\n" + js)
+
+        if (message.sourceId() == null) {
+          for (js <- lastRunJS; time <- lastRunTime) {
+            if (message.lineNumber() < js.lines.size && math.abs(SystemClock.uptimeMillis() - time) < 1000) {
+              $d("Possibly for this code:\n" + js)
+            }
           }
         }
+        else if(sources.contains(message.sourceId) && (message.lineNumber-1) < sources(message.sourceId).size) {
+          $d(source + ":" + message.lineNumber() + ": " + sources(message.sourceId)(message.lineNumber-1))
+        }
       }
+
       true
     }
   }
@@ -150,8 +157,10 @@ object WebView {
   )
 
   def checkUrl(url: String) {
-    stackTraceHandler(Nil) {
-      if (URI(url).getHost.isEmpty) $w("Android 4.4 does not like zero length hostnames: " + url)
+    if (!url.startsWith("javascript:")) {
+      stackTraceHandler(Nil) {
+        if (URI(url).getHost.isEmpty) $w("Android 4.4 does not like zero length hostnames: " + url)
+      }
     }
   }
 }

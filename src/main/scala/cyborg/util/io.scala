@@ -127,6 +127,14 @@ object io {
     def readString: String = new String(read, "UTF-8")
   }
 
+  implicit class ByteArrayCyborgIOExt(val data: Array[Byte]) extends AnyVal {
+    def writeToFile(file: String) {
+      val out = new FileOutputStream(file)
+      out.write(data)
+      out.close()
+    }
+  }
+
   implicit class UsbDeviceConnectionExt(val udc: UsbDeviceConnection) extends AnyVal {
     def bulkRead(in: UsbEndpoint, bytes: Int, timeout: Duration): Option[Array[Byte]] = {
       val buffer = new Array[Byte](bytes)
