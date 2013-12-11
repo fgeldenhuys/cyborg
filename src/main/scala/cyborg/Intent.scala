@@ -12,20 +12,17 @@ object Intent {
   implicit val stringExtraProp = new ExtraProp[String] {
     def get(intent: AIntent, key: String): Option[String] =
       for (extras <- intent.extras; value <- Option(extras.getString(key))) yield value
-    def set(intent: AIntent, key: String, value: String): Unit =
-      for (extras <- intent.extras) extras.putString(key, value)
+    def set(intent: AIntent, key: String, value: String): Unit = intent.putExtra(key, value)
   }
   implicit val intExtraProp = new ExtraProp[Int] {
     def get(intent: AIntent, key: String): Option[Int] =
       for (extras <- intent.extras; value <- Option(extras.getInt(key))) yield value
-    def set(intent: AIntent, key: String, value: Int): Unit =
-      for (extras <- intent.extras) extras.putInt(key, value)
+    def set(intent: AIntent, key: String, value: Int): Unit = intent.putExtra(key, value)
   }
   implicit val longExtraProp = new ExtraProp[Long] {
     def get(intent: AIntent, key: String): Option[Long] =
       for (extras <- intent.extras; value <- Option(extras.getLong(key))) yield value
-    def set(intent: AIntent, key: String, value: Long): Unit =
-      for (extras <- intent.extras) extras.putLong(key, value)
+    def set(intent: AIntent, key: String, value: Long): Unit = intent.putExtra(key, value)
   }
 
   implicit class IntentExt(val self: AIntent) /* extends AnyVal */ { // Nested class not allowed
