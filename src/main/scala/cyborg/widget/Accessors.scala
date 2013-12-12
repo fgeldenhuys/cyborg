@@ -1,11 +1,13 @@
 package cyborg.widget
 
+import cyborg.resources.ViewResource
 import cyborg.util.NotImplemented
 import android.view.View
 import android.widget.{SpinnerAdapter, ListAdapter}
 
 object Accessors {
   implicit class ViewAccessors(val v: android.view.View) extends AnyVal {
+    def find[A](r: ViewResource[A]) = v.findViewById(r.id).asInstanceOf[A]
     def visible = v.getVisibility == View.VISIBLE
     def visible_=(b: Boolean) { v.setVisibility(if (b) View.VISIBLE else View.INVISIBLE) }
   }
