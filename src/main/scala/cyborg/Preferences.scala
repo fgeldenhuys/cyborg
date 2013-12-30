@@ -1,6 +1,8 @@
 package cyborg
 
 import cyborg.Context._
+import cyborg.Context.Context
+import cyborg.Log._
 import scala.collection.JavaConversions._
 
 object Preferences {
@@ -11,15 +13,19 @@ object Preferences {
     private def prefs(implicit context: Context) =
       context.getSharedPreferences(section, Context.ModeMultiProcess)
 
-    def apply[T](key: String)(implicit prop: PreferencesProp[T], context: Context): Option[T] =
+    def apply[T](key: String)(implicit prop: PreferencesProp[T], context: Context): Option[T] = {
+      $d(s"Getting preference '$key'")
       prop.get(section, key)
+    }
 
     def update[T](key: String, value: T)(implicit prop: PreferencesProp[T], context: Context) {
       prop.set(section, key, value)
+      $d(s"Set preference '$key' = '$value'")
     }
 
     def delete(key: String)(implicit context: Context) {
       prefs.edit().remove(key).apply()
+      $d(s"Deleted preference '$key'")
     }
 
     def setOrDelete[T](key: String, value: Option[T])(implicit prop: PreferencesProp[T], context: Context) {
@@ -100,6 +106,8 @@ object Preferences {
     }
     def set(section: String, key: String, value: String)(implicit context: Context) {
       prefs(section).edit().putString(key, value).apply()
+      assert(prefs(section).getString(key, null) == value,
+        s"String preference was not set, section='$section' key='$key' value='$value'")
     }
   }
 
