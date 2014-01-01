@@ -18,7 +18,7 @@ object SqlitePreferences {
       helper.writableDatabase(db => prop.put(db, section, key, value))
     }
 
-    def ? [T](key: String)(implicit prop: PrefProp[T]): Boolean = {
+    def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
       helper.readableDatabase(db => prop.?(db, section, key))
     }
 
@@ -35,6 +35,9 @@ object SqlitePreferences {
     def makeDefault[T](key: String, value: T)(implicit prop: PrefProp[T]) {
       if (apply[T](key).isEmpty) update[T](key, value)
     }
+
+    def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] =
+      helper.writableDatabase(db => prop.increment(db, section, key))
 
     class PrefSet(val key: String) {
       def += [T](value: T)(implicit prop: PrefProp[T]) {
@@ -60,6 +63,11 @@ object SqlitePreferences {
           }
         }
       }
+
+      def toList[T](implicit prop: PrefProp[T]): List[T] = {
+        helper.readableDatabase(db => prop.setGet(db, section, key))
+      }
+      def toSet[T](implicit prop: PrefProp[T]): Set[T] = toList[T](prop).toSet
     }
 
     def set(key: String) = new PrefSet(key)
@@ -118,6 +126,14 @@ object SqlitePreferences {
 
     def ? (db: SQLiteDatabase, section: String, key: String): Boolean = get(db, section, key).isDefined
 
+    def increment(db: SQLiteDatabase, section: String, key: String): Option[T] = {
+      db.transaction { db =>
+        db.raw("INSERT OR IGNORE INTO prime (section, key, value) VALUES (?, ?, 1)", section, key)
+        db.raw("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
+        db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key).get("value")(getter)
+      } .flatten
+    }
+
     private def getSetId(db: SQLiteDatabase): Option[Long] = {
       db.raw("UPDATE meta SET value = value + 1 WHERE property = ?", "set_id")
       db.raw("SELECT value FROM meta WHERE property = ?", "set_id").get[Long]("value")
@@ -159,6 +175,22 @@ object SqlitePreferences {
           }
         }
       }
+    }
+
+    def setGet(db: SQLiteDatabase, section: String, key: String): List[T] = {
+      db.transaction { db =>
+        val check = db.raw("SELECT value, set FROM prime WHERE section = ? AND key = ?", section, key)
+        if (check.isEmpty) // Nothing there
+          List.empty
+        else if (check.get[Int]("set").exists(_ == 0)) // Value defined, but not a set
+          throw NotASetException(section, key)
+        else {
+          check.get[Long]("value") .map { setId =>
+            db.raw("SELECT value FROM sets WHERE section = ? AND setId = ?", section, setId.toString)
+              .toTypedList[T]("value")(getter)
+          } .getOrElse (List.empty)
+        }
+      } .getOrElse (List.empty)
     }
 
     def getter: CursorGetter[T]

@@ -247,6 +247,13 @@ object SQLite {
       result
     }
 
+    def toTypedList[T](field: String)(implicit getter: CursorGetter[T]): List[T] = {
+      cursor.moveToPosition(-1)
+      val result = toTypedListHelper[T](field)
+      cursor.close()
+      result
+    }
+
     private def cursor2map(cursor: AC): Map[String, String] =
       cursor.getColumnNames.map(name =>
         (name, cursor.getString(cursor.getColumnIndex(name)))).toMap
@@ -283,6 +290,14 @@ object SQLite {
 
       if (cursor.isAfterLast) acc
       else toBlobListHelper(cursor2blobMap(cursor) :: acc)
+    }
+
+    @tailrec private def toTypedListHelper[T](field: String, acc: List[T] = List.empty[T])(implicit getter: CursorGetter[T]): List[T] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+
+      if (cursor.isAfterLast) acc
+      else toTypedListHelper[T](field, getter.get(cursor, cursor.getColumnIndex(field)).map(_ +: acc) getOrElse acc)
     }
 
     // Use when SELECT COUNT(*) type query was used
