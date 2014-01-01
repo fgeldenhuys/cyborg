@@ -202,6 +202,9 @@ object SQLite {
   implicit val intCursorGetter = new CursorGetter[Int] {
     def get(cursor: AC, column: Int): Option[Int] = Option(cursor.getInt(column))
   }
+  implicit val longCursorGetter = new CursorGetter[Long] {
+    def get(cursor: AC, column: Int): Option[Long] = Option(cursor.getLong(column))
+  }
   implicit val booleanCursorGetter = new CursorGetter[Boolean] {
     def get(cursor: AC, column: Int): Option[Boolean] = Option(cursor.getInt(column) == 1)
   }

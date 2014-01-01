@@ -5,11 +5,11 @@ import cyborg.Context.Context
 import cyborg.Log._
 import scala.collection.JavaConversions._
 
-object Preferences {
+@Deprecated object Preferences {
   case class WrongPrefTypeException(message: String) extends Exception(message)
   case class PrefNotFoundException(message: String) extends Exception(message)
 
-  case class Preferences(section: String) {
+  @Deprecated case class Preferences(section: String) {
     $w("Using stupid broken android preferences here!\n" + cyborg.util.debug.getStackTrace)
 
     private def prefs(implicit context: Context) =
