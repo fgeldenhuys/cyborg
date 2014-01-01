@@ -175,6 +175,11 @@ object SqlitePreferences {
     def putter = intContentValuesPutter
   }
 
+  implicit val longPrefProp = new PrefProp[Long] {
+    def getter = longCursorGetter
+    def putter = longContentValuesPutter
+  }
+
   implicit val booleanPrefProp = new PrefProp[Boolean] {
     def getter = booleanCursorGetter
     def putter = booleanContentValuesPutter
@@ -183,4 +188,18 @@ object SqlitePreferences {
     }
   }
 
+  class JavaPreferences(androidContext: android.content.Context, section: String) {
+    val p = new Preferences(section)
+    implicit val context: Context = androidContext
+
+    def getString(key: String, default: String): String = p[String](key) getOrElse default
+    def getInt(key: String, default: Int): Int = p[Int](key) getOrElse default
+    def getLong(key: String, default: Long): Long = p[Long](key) getOrElse default
+    def getBoolean(key: String, default: Boolean): Boolean = p[Boolean](key) getOrElse default
+
+    def setString(key: String, value: String) { p(key) = value }
+    def setInt(key: String, value: Int) { p(key) = value }
+    def setLong(key: String, value: Long) { p(key) = value }
+    def setBoolean(key: String, value: Boolean) { p(key) = value }
+  }
 }
