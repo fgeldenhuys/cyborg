@@ -12,7 +12,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   import cyborg.db.KeyValue.KeyValueException
 
   def close() { stackTraceHandler(Unit) { sqlite.close() } }
-  def transaction[T](f: (KeyValue) => T): Option[T] = sqlite.transaction(f(this))
+  def transaction[T](f: (KeyValue) => T): Option[T] = sqlite.transaction { db => f(this) }
 
   private val applyQuery = s"SELECT value FROM '$bucket' WHERE key = ?"
   private val allQuery = s"SELECT key, value FROM '$bucket'"
@@ -150,7 +150,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     if (in.string(ExportIdentifier.size) != ExportIdentifier) throw ImportException("Export identifier mismatch")
     if (in.int != ExportVersion) throw ImportException("Export version unknown")
     val entries = in.int
-    sqlite.transaction {
+    sqlite.transaction { db =>
       for (entry <- 0 until entries) {
         val key = in.decString
         val stringindex = in.decString
@@ -159,16 +159,16 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
           case StringIdentifier =>
             val string = in.decString
             if (stringindex.isEmpty)
-              sqlite.insert(bucket, "key" -> key, "value" -> string)
+              db.insert(bucket, "key" -> key, "value" -> string)
             else
-              sqlite.insert(bucket, "key" -> key, "stringindex" -> stringindex, "value" -> string)
+              db.insert(bucket, "key" -> key, "stringindex" -> stringindex, "value" -> string)
           case BlobIdentifier =>
             val size = in.int
             val blob = in.bytes(size)
             if (stringindex.isEmpty)
-              sqlite.insert(bucket, "key" -> key, "value" -> blob)
+              db.insert(bucket, "key" -> key, "value" -> blob)
             else
-              sqlite.insert(bucket, "key" -> key, "stringindex" -> stringindex, "value" -> blob)
+              db.insert(bucket, "key" -> key, "stringindex" -> stringindex, "value" -> blob)
           case _ =>
             throw ImportException("Unknown value type byte encountered")
         }

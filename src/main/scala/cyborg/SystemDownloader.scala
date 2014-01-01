@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.{ParcelFileDescriptor, Environment}
 import cyborg.db.SQLite._
 import cyborg.Context._
-import cyborg.Preferences
 import Preferences._
 import cyborg.util.binary._
 import cyborg.util.concurrent._

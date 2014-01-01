@@ -49,11 +49,12 @@ object SQLite {
 
     def raw(sql: String, args: String*) = db.rawQuery(sql, args.toArray)
 
-    def transaction[T](f: => T): Option[T] = {
+    // TODO: maybe make transaction also close db at the end like apply
+    def transaction[T](f: (ASQLD) => T): Option[T] = {
       try {
         db.beginTransaction()
         try {
-          val result = f
+          val result = f(db)
           db.setTransactionSuccessful()
           Some(result)
         }
@@ -94,6 +95,16 @@ object SQLite {
       cv
     }
 
+    def makeContentValues[T1, T2, T3, T4](v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4))
+                                     (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4]): ContentValues = {
+      val cv = new ContentValues(4)
+      cvputter1(cv, v1._1, v1._2)
+      cvputter2(cv, v2._1, v2._2)
+      cvputter3(cv, v3._1, v3._2)
+      cvputter4(cv, v4._1, v4._2)
+      cv
+    }
+
     def insert[T1, T2](table: String, v1: (String, T1), v2: (String, T2))
                           (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2]): Option[Long] = {
       val result = db.insert(table, null, makeContentValues(v1, v2))
@@ -106,9 +117,27 @@ object SQLite {
       if (result == -1) None else Some(result)
     }
 
+    def insert[T1, T2, T3, T4](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4))
+                          (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4]): Option[Long] = {
+      val result = db.insert(table, null, makeContentValues(v1, v2, v3, v4))
+      if (result == -1) None else Some(result)
+    }
+
     def replace[T1, T2](table: String, v1: (String, T1), v2: (String, T2))
                    (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2]): Option[Long] = {
       val result = db.replace(table, null, makeContentValues(v1, v2))
+      if (result == -1) None else Some(result)
+    }
+
+    def replace[T1, T2, T3](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3))
+                       (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3]): Option[Long] = {
+      val result = db.replace(table, null, makeContentValues(v1, v2, v3))
+      if (result == -1) None else Some(result)
+    }
+
+    def replace[T1, T2, T3, T4](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4))
+                           (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4]): Option[Long] = {
+      val result = db.replace(table, null, makeContentValues(v1, v2, v3, v4))
       if (result == -1) None else Some(result)
     }
 

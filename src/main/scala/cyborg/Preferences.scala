@@ -10,6 +10,8 @@ object Preferences {
   case class PrefNotFoundException(message: String) extends Exception(message)
 
   case class Preferences(section: String) {
+    $w("Using stupid broken android preferences here!\n" + cyborg.util.debug.getStackTrace)
+
     private def prefs(implicit context: Context) =
       context.getSharedPreferences(section, Context.ModeMultiProcess)
 
