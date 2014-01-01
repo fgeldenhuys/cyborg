@@ -18,8 +18,8 @@ object SqlitePreferences {
       helper.writableDatabase(db => prop.put(db, section, key, value))
     }
 
-    def ? [T](key: String)(implicit prop: PrefProp[T]) {
-      helper.readableDatabase(db => prop)
+    def ? [T](key: String)(implicit prop: PrefProp[T]): Boolean = {
+      helper.readableDatabase(db => prop.?(db, section, key))
     }
 
     def delete(key: String) {
