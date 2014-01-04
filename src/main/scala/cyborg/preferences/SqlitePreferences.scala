@@ -107,8 +107,8 @@ object SqlitePreferences {
       def onCreate(db: SQLiteDatabase) {}
 
       def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
-        db.raw("DROP TABLE IF EXISTS prime;")
-        db.raw("DROP TABLE IF EXISTS sets;")
+        db.exec("DROP TABLE IF EXISTS prime;")
+        db.exec("DROP TABLE IF EXISTS sets;")
         onCreate(db)
       }
     }
@@ -128,14 +128,14 @@ object SqlitePreferences {
 
     def increment(db: SQLiteDatabase, section: String, key: String): Option[T] = {
       db.transaction { db =>
-        db.raw("INSERT OR IGNORE INTO prime (section, key, value) VALUES (?, ?, 1)", section, key)
-        db.raw("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
+        db.exec("INSERT OR IGNORE INTO prime (section, key, value) VALUES (?, ?, 1)", section, key)
+        db.exec("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
         db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key).get("value")(getter)
       } .flatten
     }
 
     private def getSetId(db: SQLiteDatabase): Option[Long] = {
-      db.raw("UPDATE meta SET value = value + 1 WHERE property = ?", "set_id")
+      db.exec("UPDATE meta SET value = value + 1 WHERE property = ?", "set_id")
       db.raw("SELECT value FROM meta WHERE property = ?", "set_id").get[Long]("value")
     }
 
