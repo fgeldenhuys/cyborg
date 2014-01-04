@@ -48,6 +48,7 @@ object SQLite {
     }
 
     def raw(sql: String, args: String*) = db.rawQuery(sql, args.toArray)
+    def exec(sql: String, args: String*) = db.execSQL(sql, args.toArray)
 
     // TODO: maybe make transaction also close db at the end like apply
     def transaction[T](f: (ASQLD) => T): Option[T] = {

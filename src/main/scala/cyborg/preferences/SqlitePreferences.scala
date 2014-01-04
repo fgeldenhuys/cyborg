@@ -50,10 +50,10 @@ object SqlitePreferences {
 
       def delete() {
         helper.writableDatabase.transaction { db =>
-          val check = db.raw("SELECT value, set FROM prime WHERE section = ? AND key = ?", section, key)
+          val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
           if (check.isEmpty) // Nothing there
             throw KeyNotDefinedException(section, key)
-          else if (check.get[Int]("set").exists(_ == 0)) // Value defined, but not a set
+          else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
             throw NotASetException(section, key)
           else {
             check.get[Long]("value") map { setId =>
@@ -74,25 +74,25 @@ object SqlitePreferences {
 
     class DbOpenHelper extends SQLiteOpenHelper(context, "CyborgPreferencesDb", null, 1) {
       override def onOpen(db: SQLiteDatabase) {
-        db.raw(
+        db.exec(
           """
             | CREATE TABLE IF NOT EXISTS prime (
             |   id INTEGER PRIMARY KEY NOT NULL,
             |   section TEXT NOT NULL,
             |   key TEXT NOT NULL,
             |   value BLOB NOT NULL,
-            |   set INTEGER DEFAULT 0,
+            |   setValue INTEGER DEFAULT 0,
             |   UNIQUE(section, key) ON CONFLICT REPLACE
             | );
           """.stripMargin)
-        db.raw(
+        db.exec(
           """
             | CREATE TABLE IF NOT EXISTS meta (
             |   property TEXT PRIMARY KEY,
             |   value BLOB NOT NULL
             | );
           """.stripMargin)
-        db.raw(
+        db.exec(
           """
             | CREATE TABLE IF NOT EXISTS sets (
             |   id INTEGER PRIMARY KEY NOT NULL,
@@ -121,7 +121,7 @@ object SqlitePreferences {
 
     def put(db: SQLiteDatabase, section: String, key: String, value: T) {
       //todo: delete set values from sets table if they exist
-      db.replace("prime", "section" -> section, "key" -> key, "value" -> value, "set" -> 0)(stringContentValuesPutter, stringContentValuesPutter, putter, intContentValuesPutter)
+      db.replace("prime", "section" -> section, "key" -> key, "value" -> value, "setValue" -> 0)(stringContentValuesPutter, stringContentValuesPutter, putter, intContentValuesPutter)
     }
 
     def ? (db: SQLiteDatabase, section: String, key: String): Boolean = get(db, section, key).isDefined
@@ -141,21 +141,21 @@ object SqlitePreferences {
 
     def setAdd(db: SQLiteDatabase, section: String, key: String, value: T) {
       db.transaction { db =>
-        val check = db.raw("SELECT value, set FROM prime WHERE section = ? AND key = ?", section, key)
+        val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
         if (check.isEmpty) { // New set, no previous value
           getSetId(db) map { setId =>
-            db.insert("prime", "section" -> section, "key" -> key, "value" -> setId, "set" -> 1)
+            db.insert("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
             db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
           }
         }
-        else if (check.get[Int]("set").exists(_ == 1)) { // Already a set
+        else if (check.get[Int]("setValue").exists(_ == 1)) { // Already a set
           check.get[Int]("value") map { prime =>
             db.insert("sets", "section" -> section, "setId" -> prime, "value" -> value)(stringContentValuesPutter, intContentValuesPutter, putter)
           }
         }
         else { // Assuming there is a previous non-set value assigned to this key
           getSetId(db) map { setId =>
-            db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "set" -> 1)
+            db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
             db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
           }
         }
@@ -164,10 +164,10 @@ object SqlitePreferences {
 
     def setRemove(db: SQLiteDatabase, section: String, key: String, value: T) {
       db.transaction { db =>
-        val check = db.raw("SELECT value, set FROM prime WHERE section = ? AND key = ?", section, key)
+        val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
         if (check.isEmpty) // Nothing there
           throw KeyNotDefinedException(section, key)
-        else if (check.get[Int]("set").exists(_ == 0)) // Value defined, but not a set
+        else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
           throw NotASetException(section, key)
         else {
           check.get[Long]("value") map { setId =>
@@ -179,10 +179,10 @@ object SqlitePreferences {
 
     def setGet(db: SQLiteDatabase, section: String, key: String): List[T] = {
       db.transaction { db =>
-        val check = db.raw("SELECT value, set FROM prime WHERE section = ? AND key = ?", section, key)
+        val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
         if (check.isEmpty) // Nothing there
           List.empty
-        else if (check.get[Int]("set").exists(_ == 0)) // Value defined, but not a set
+        else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
           throw NotASetException(section, key)
         else {
           check.get[Long]("value") .map { setId =>
