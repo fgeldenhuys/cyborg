@@ -1,18 +1,21 @@
 package cyborg.preferences
 
-import cyborg.Context._
+import cyborg.Context, cyborg.Context._
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.db.SQLite._
+import android.content.SharedPreferences
 
 object SqlitePreferences {
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
   case class NotASetException(section: String, key: String) extends Exception(s"Key '$key' is not a set in section '$section'")
 
-  class Preferences(val section: String)(implicit val context: Context) {
+  class Preferences(val section: String, val androidPrefsSection: String)(implicit val context: Context) {
     val helper = new DbOpenHelper
+    val androidPrefs = context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess)
 
-    def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] =
-      helper.readableDatabase(db => prop.get(db, section, key))
+    def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
+      helper.readableDatabase(db => prop.get(db, section, key)) orElse prop.getAndroidPref(androidPrefs, key)
+    }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
       helper.writableDatabase(db => prop.put(db, section, key, value))
@@ -195,21 +198,27 @@ object SqlitePreferences {
 
     def getter: CursorGetter[T]
     def putter: ContentValuesPutter[T]
+    def getAndroidPref(prefs: SharedPreferences, key: String): Option[T]
   }
 
   implicit val stringPrefProp = new PrefProp[String] {
     def getter = stringCursorGetter
     def putter = stringContentValuesPutter
+    def getAndroidPref(prefs: SharedPreferences, key: String) = Option(prefs.getString(key, null))
   }
 
   implicit val intPrefProp = new PrefProp[Int] {
     def getter = intCursorGetter
     def putter = intContentValuesPutter
+    def getAndroidPref(prefs: SharedPreferences, key: String) =
+      if (prefs.contains(key)) Some(prefs.getInt(key, 0)) else None
   }
 
   implicit val longPrefProp = new PrefProp[Long] {
     def getter = longCursorGetter
     def putter = longContentValuesPutter
+    def getAndroidPref(prefs: SharedPreferences, key: String) =
+      if (prefs.contains(key)) Some(prefs.getLong(key, 0)) else None
   }
 
   implicit val booleanPrefProp = new PrefProp[Boolean] {
@@ -218,11 +227,16 @@ object SqlitePreferences {
     override def ? (db: SQLiteDatabase, section: String, key: String): Boolean = {
       get(db, section, key) getOrElse false
     }
+    def getAndroidPref(prefs: SharedPreferences, key: String) =
+      if (prefs.contains(key)) Some(prefs.getBoolean(key, false)) else None
   }
 
-  class JavaPreferences(androidContext: android.content.Context, section: String) {
-    val p = new Preferences(section)
+  class JavaPreferences(androidContext: android.content.Context, section: String, androidPrefsSection: String) {
+    assert(androidContext != null)
+    assert(section != null)
+
     implicit val context: Context = androidContext
+    val p = new Preferences(section, androidPrefsSection)
 
     def getString(key: String, default: String): String = p[String](key) getOrElse default
     def getInt(key: String, default: Int): Int = p[Int](key) getOrElse default
