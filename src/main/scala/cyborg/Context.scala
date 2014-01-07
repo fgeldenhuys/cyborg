@@ -27,6 +27,8 @@ object Context {
   implicit val usbManagerGetter = new SimpleSystemServiceGetter[UsbManager](android.content.Context.USB_SERVICE)
 
   class Context(val c: android.content.Context) /* extends AnyVal */ { // nested class not allowed in value class: will be fixed
+    assert(c != null)
+
     def resources = c.getResources
     def systemService[T](implicit getter: SystemServiceGetter[T]): T = getter.get(c)
 

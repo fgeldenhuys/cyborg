@@ -4,6 +4,7 @@ import cyborg.Context, cyborg.Context._
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.db.SQLite._
 import android.content.SharedPreferences
+import scala.util.Try
 
 object SqlitePreferences {
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
@@ -11,10 +12,17 @@ object SqlitePreferences {
 
   class Preferences(val section: String, val androidPrefsSection: String)(implicit val context: Context) {
     val helper = new DbOpenHelper
-    val androidPrefs = context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess)
+    val androidPrefs: Option[SharedPreferences] = {
+        assert(context != null)
+        assert(context.c != null)
+        assert(androidPrefsSection != null)
+      Try {
+        Option(context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess))
+      } .toOption.flatten
+    }
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      helper.readableDatabase(db => prop.get(db, section, key)) orElse prop.getAndroidPref(androidPrefs, key)
+      helper.readableDatabase(db => prop.get(db, section, key)) orElse androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key))
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
@@ -133,13 +141,13 @@ object SqlitePreferences {
       db.transaction { db =>
         db.exec("INSERT OR IGNORE INTO prime (section, key, value) VALUES (?, ?, 1)", section, key)
         db.exec("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
-        db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key).get("value")(getter)
+        db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key).getAndClose("value")(getter)
       } .flatten
     }
 
     private def getSetId(db: SQLiteDatabase): Option[Long] = {
       db.exec("UPDATE meta SET value = value + 1 WHERE property = ?", "set_id")
-      db.raw("SELECT value FROM meta WHERE property = ?", "set_id").get[Long]("value")
+      db.raw("SELECT value FROM meta WHERE property = ?", "set_id").getAndClose[Long]("value")
     }
 
     def setAdd(db: SQLiteDatabase, section: String, key: String, value: T) {
@@ -162,6 +170,7 @@ object SqlitePreferences {
             db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
           }
         }
+        check.close()
       }
     }
 
@@ -177,13 +186,14 @@ object SqlitePreferences {
             db.delete("sets", "section = ? AND setId = ? AND value = ?", section, setId, value.toString)
           }
         }
+        check.close()
       }
     }
 
     def setGet(db: SQLiteDatabase, section: String, key: String): List[T] = {
       db.transaction { db =>
         val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-        if (check.isEmpty) // Nothing there
+        val result = if (check.isEmpty) // Nothing there
           List.empty
         else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
           throw NotASetException(section, key)
@@ -193,6 +203,8 @@ object SqlitePreferences {
               .toTypedList[T]("value")(getter)
           } .getOrElse (List.empty)
         }
+        check.close()
+        result
       } .getOrElse (List.empty)
     }
 

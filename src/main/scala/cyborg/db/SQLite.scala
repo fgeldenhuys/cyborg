@@ -225,6 +225,12 @@ object SQLite {
       else None
     }
 
+    def getAndClose[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
+      val result: Option[T] = get[T](columnName)
+      cursor.close()
+      result
+    }
+
     def isEmpty: Boolean = cursor.getCount == 0
 
     def toList: List[Map[String, String]] = {
