@@ -84,7 +84,7 @@ object SqlitePreferences {
     def set(key: String) = new PrefSet(key)
 
     class DbOpenHelper extends SQLiteOpenHelper(context, "CyborgPreferencesDb", null, 1) {
-      override def onOpen(db: SQLiteDatabase) {
+      def onCreate(db: SQLiteDatabase) {
         db.exec(
           """
             | CREATE TABLE IF NOT EXISTS prime (
@@ -114,8 +114,6 @@ object SqlitePreferences {
           """.stripMargin)
         db.insert("meta", "property" -> "set_id", "value" -> 1)
       }
-
-      def onCreate(db: SQLiteDatabase) {}
 
       def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
         db.exec("DROP TABLE IF EXISTS prime;")
