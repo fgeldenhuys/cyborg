@@ -8,12 +8,24 @@ import java.nio.ByteBuffer
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import cyborg.util.execution.ScheduledExecutionContext
+import cyborg.Log._
 
 object io {
   val BufferSize = 1024
   val MaxBufferSize = 1024 * 1024
 
   case class FileTooLargeException(message: String) extends IOException(message)
+
+  private lazy val doubleDotRegex = "[^/]+/\\.\\.".r
+  private lazy val singleDotRegex = "/\\./".r
+  private lazy val multiSlashRegex = "/+".r
+  def makeCanonicalPath(current: String, cd: String): String = {
+    var result = if (cd.startsWith("/")) cd // Absolute path
+                   else current.replaceFirst("/[^/]*$", "/") + cd // Relative path
+    while (doubleDotRegex.findFirstIn(result).isDefined) result = doubleDotRegex.replaceAllIn(result, "")
+    result = singleDotRegex.replaceAllIn(result, "/")
+    multiSlashRegex.replaceAllIn(result, "/")
+  }
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
     val buf = new Array[Byte](BufferSize)
