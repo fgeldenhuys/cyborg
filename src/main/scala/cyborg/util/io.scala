@@ -20,15 +20,10 @@ object io {
   private lazy val singleDotRegex = "/\\./".r
   private lazy val multiSlashRegex = "/+".r
   def makeCanonicalPath(current: String, cd: String): String = {
-    $d(s"current=$current cd=$cd")
     var result = if (cd.startsWith("/")) cd // Absolute path
                  else if (!current.contains("/")) cd // Current is file
                  else current.replaceFirst("/[^/]*$", "/") + cd // Relative path
-    $d("absolute="+result)
-    while (doubleDotRegex.findFirstIn(result).isDefined) {
-      result = doubleDotRegex.replaceAllIn(result, "")
-      $d("absolute="+result)
-    }
+    while (doubleDotRegex.findFirstIn(result).isDefined) result = doubleDotRegex.replaceAllIn(result, "")
     result = singleDotRegex.replaceAllIn(result, "/")
     multiSlashRegex.replaceAllIn(result, "/")
   }
