@@ -162,6 +162,9 @@ object SQLite {
   implicit class OpenHelper(val oh: SQLiteOpenHelper) extends AnyVal {
     import cyborg.Log._
 
+    // TODO: the cancel timeout thing is broken
+    // def readableDatabase(tryUntil: Long = 0): ASQLD = {
+    //  val cancel = if (tryUntil == 0) System.currentTimeMillis() + 1000 else tryUntil
     def readableDatabase: ASQLD = {
       val cancel = System.currentTimeMillis() + 1000
       try {
@@ -170,7 +173,7 @@ object SQLite {
       catch {
         case e: SQLiteDatabaseLockedException =>
           if (System.currentTimeMillis() > cancel) throw e
-          $d("Waiting for locked database: " + e.getMessage)
+          $w("Waiting for locked database: " + e.getMessage)
           try { Thread.sleep(10) } catch { case e: InterruptedException => }
           readableDatabase
       }
@@ -184,7 +187,7 @@ object SQLite {
       catch {
         case e: SQLiteDatabaseLockedException =>
           if (System.currentTimeMillis() > cancel) throw e
-          $d("Waiting for locked database: " + e.getMessage)
+          $w("Waiting for locked database: " + e.getMessage)
           try { Thread.sleep(10) } catch { case e: InterruptedException => }
           writableDatabase
       }

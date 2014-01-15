@@ -90,9 +90,9 @@ trait Http {
                 val responseCode = http.getResponseCode
                 $w(s"$responseCode $e for '$url'")
                 p success SimpleHttpResult(responseCode, errorContent)
-              } within (10 seconds) recover {
+              } within (2 seconds) recover {
                 case CancelledExecution(message) =>
-                  $w(s"Timeout error for '$url'")
+                  $w(s"Timeout getting error content for '$url'")
                   p success SimpleHttpResult(-1, message)
               }
             case e: IOException =>
@@ -102,9 +102,9 @@ trait Http {
                 val responseCode = http.getResponseCode
                 $w(s"$responseCode $e for '$url'")
                 p success SimpleHttpResult(responseCode, errorContent)
-              } within (10 seconds) recover {
+              } within (2 seconds) recover {
                 case CancelledExecution(message) =>
-                  $w(s"Timeout error for '$url'")
+                  $w(s"Timeout getting error content for '$url'")
                   p success SimpleHttpResult(-1, message)
               }
           }

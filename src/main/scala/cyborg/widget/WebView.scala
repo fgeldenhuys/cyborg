@@ -171,6 +171,7 @@ class WebViewClient extends android.webkit.WebViewClient {
 
   override def onPageFinished(view: webkit.WebView, url: String) {
     super.onPageFinished(view, url)
+    $d(s"PAGE finished current=$url previous=$previousUrl")
     if (url != previousUrl) {
       previousUrl = url
       pageFinishedFunction.map(_())
