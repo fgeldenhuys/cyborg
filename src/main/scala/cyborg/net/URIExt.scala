@@ -10,7 +10,12 @@ object URIExt {
     }
   }
 
-  def URI(uri: String): URI = new URI(uri)
+  def URI(uri: String): Option[URI] =
+    try {
+      Option(new URI(uri))
+    } catch {
+      case _ => None
+    }
 
   object URIAuthority {
     def unapply(uri: URI): Option[String] = Option(uri.getAuthority)

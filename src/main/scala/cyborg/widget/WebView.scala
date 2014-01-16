@@ -159,7 +159,10 @@ object WebView {
   def checkUrl(url: String) {
     if (!url.startsWith("javascript:")) {
       stackTraceHandler(Nil) {
-        if (URI(url).getHost.isEmpty) $w("Android 4.4 does not like zero length hostnames: " + url)
+        URI(url).map(_.getHost).flatMap(x =>
+          if (!x.isEmpty) Some("Android 4.4 does not like zero length hostnames: " + url)
+          else None
+        ).foreach($w(_))
       }
     }
   }
