@@ -7,6 +7,7 @@ import android.support.v4.content.LocalBroadcastManager
 import android.view.LayoutInflater
 import cyborg.Intent._
 import cyborg.Log._
+import android.net.ConnectivityManager
 
 object Context {
   val ModePrivate = android.content.Context.MODE_PRIVATE
@@ -22,6 +23,7 @@ object Context {
     def get(implicit context: Context): T = context.getSystemService(name).asInstanceOf[T]
   }
   implicit val activityManagerGetter = new SimpleSystemServiceGetter[ActivityManager](android.content.Context.ACTIVITY_SERVICE)
+  implicit val connectivityManagerGetter = new SimpleSystemServiceGetter[ConnectivityManager](android.content.Context.CONNECTIVITY_SERVICE)
   implicit val downloadManagerGetter = new SimpleSystemServiceGetter[DownloadManager](android.content.Context.DOWNLOAD_SERVICE)
   implicit val layoutInflaterGetter = new SimpleSystemServiceGetter[LayoutInflater](android.content.Context.LAYOUT_INFLATER_SERVICE)
   implicit val usbManagerGetter = new SimpleSystemServiceGetter[UsbManager](android.content.Context.USB_SERVICE)
