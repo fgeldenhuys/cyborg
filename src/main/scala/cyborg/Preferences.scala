@@ -16,18 +16,18 @@ import scala.collection.JavaConversions._
       context.getSharedPreferences(section, Context.ModeMultiProcess)
 
     def apply[T](key: String)(implicit prop: PreferencesProp[T], context: Context): Option[T] = {
-      $d(s"Getting preference '$key'")
+      //$d(s"Getting preference '$key'")
       prop.get(section, key)
     }
 
     def update[T](key: String, value: T)(implicit prop: PreferencesProp[T], context: Context) {
       prop.set(section, key, value)
-      $d(s"Set preference '$key' = '$value'")
+      //$d(s"Set preference '$key' = '$value'")
     }
 
     def delete(key: String)(implicit context: Context) {
       prefs.edit().remove(key).apply()
-      $d(s"Deleted preference '$key'")
+      //$d(s"Deleted preference '$key'")
     }
 
     def setOrDelete[T](key: String, value: Option[T])(implicit prop: PreferencesProp[T], context: Context) {
