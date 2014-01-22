@@ -24,6 +24,11 @@ object Intent {
       for (extras <- intent.extras; value <- Option(extras.getLong(key))) yield value
     def set(intent: AIntent, key: String, value: Long): Unit = intent.putExtra(key, value)
   }
+  implicit val booleanExtraProp = new ExtraProp[Boolean] {
+    def get(intent: AIntent, key: String): Option[Boolean] =
+      for (extras <- intent.extras; value <- Option(extras.getBoolean(key))) yield value
+    def set(intent: AIntent, key: String, value: Boolean): Unit = intent.putExtra(key, value)
+  }
 
   implicit class IntentExt(val self: AIntent) /* extends AnyVal */ { // Nested class not allowed
     def start(implicit activity: Activity) { activity.startActivity(self) }
