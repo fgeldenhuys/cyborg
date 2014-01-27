@@ -14,11 +14,6 @@ object control {
     }
   }
 
-  def OptionWithFail[A](x: A)(f: => Any): Option[A] = {
-    if (x == null) { f; None }
-    else Some(x)
-  }
-
   def stackTraceHandler[T](failed: T) = handling(classOf[Exception]) by { ex =>
     ex.printStackTrace()
     failed

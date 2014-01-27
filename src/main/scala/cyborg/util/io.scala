@@ -8,7 +8,6 @@ import java.nio.ByteBuffer
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import cyborg.util.execution.ScheduledExecutionContext
-import cyborg.Log._
 
 object io {
   val BufferSize = 1024
@@ -137,12 +136,23 @@ object io {
       buffer
     }
 
+    def readBytes(bytes: Int): Array[Byte] = {
+      val in = new BufferedInputStream(new FileInputStream(file))
+      val buffer = Array.ofDim[Byte](bytes)
+      in.read(buffer)
+      in.close()
+      buffer
+    }
+
     def readString: String = new String(read, "UTF-8")
 
     def unzipStream(path: String): Option[InputStream] = {
       val zip = new java.util.zip.ZipFile(file)
       Option(zip.getEntry(path)) map zip.getInputStream
     }
+
+    def sha1: Array[Byte] = read.sha1
+    def sha1Sample(bytes: Int): Array[Byte] = readBytes(bytes).sha1
   }
 
   implicit class ByteArrayCyborgIOExt(val data: Array[Byte]) extends AnyVal {
