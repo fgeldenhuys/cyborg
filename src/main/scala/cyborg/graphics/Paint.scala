@@ -27,6 +27,7 @@ object Paint {
   }
 
   implicit class PaintExt(val paint: android.graphics.Paint) extends AnyVal {
+    def alpha(a: Int) = { paint.setAlpha(a); paint }
     def color(c: Int) = { paint.setColor(c); paint }
     def dither(b: Boolean) = { paint.setDither(b); paint }
     def shader(s: android.graphics.Shader) = { paint.setShader(s); paint }
@@ -36,6 +37,8 @@ object Paint {
 
   implicit class TextPaintExt(val paint: android.text.TextPaint) extends AnyVal {
     def color(c: Int) = { paint.setColor(c); paint }
+    def fakeBold(b: Boolean) = { paint.setFakeBoldText(b); paint }
+    def shadowLayer(r: Float, dx: Float, dy: Float, c: Int) = { paint.setShadowLayer(r, dx, dy, c); paint }
     def strokeWidth(w: Float) = { paint.setStrokeWidth(w); paint }
     def style(s: android.graphics.Paint.Style) = { paint.setStyle(s); paint }
     def textAlign(a: android.graphics.Paint.Align) = { paint.setTextAlign(a); paint }
