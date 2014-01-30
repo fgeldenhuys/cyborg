@@ -111,4 +111,10 @@ object execution {
       timeout = systemTime + d.toMillis
     }
   }
+
+  class ExecutionTimer(val start: Long) {
+    def apply() = systemTime - start
+  }
+  def startTimer = new ExecutionTimer(systemTime)
+
 }

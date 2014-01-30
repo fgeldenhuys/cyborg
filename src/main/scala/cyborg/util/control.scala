@@ -19,6 +19,16 @@ object control {
     failed
   }
 
+  def tryOption[T](f: => T): Option[T] = {
+    try {
+      Option(f)
+    } catch {
+      case e =>
+        e.printStackTrace()
+        None
+    }
+  }
+
   def tryElse[T](f: => T)(e: Exception => T) = handling(classOf[Exception])
 
   case class NotImplemented(message: String = "Not implemented") extends Exception(message)

@@ -1,13 +1,13 @@
 package cyborg.graphics
 
-import android.graphics.{Paint => AP, Canvas, Bitmap}
+import android.graphics.{Paint => AP, Canvas, Bitmap => B}
 import scala.collection.mutable
 import scala.util.control.Exception._
 
 class HitMask[A](width: Int, height: Int) {
   import cyborg.Log._
 
-  val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+  val bitmap = B.createBitmap(width, height, B.Config.ARGB_8888)
   val canvas = new Canvas(bitmap)
   val byKey = mutable.Map.empty[Int, A]
   val byValue = mutable.Map.empty[A, AP]
