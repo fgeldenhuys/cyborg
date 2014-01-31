@@ -23,5 +23,5 @@ object Bitmap {
     }
   }
 
-  def makeBitmap(bytes: Array[Byte]): B = BF.decodeByteArray(bytes, 0, bytes.length)
+  def makeBitmap(bytes: Array[Byte]): Option[B] = Option(BF.decodeByteArray(bytes, 0, bytes.length))
 }
