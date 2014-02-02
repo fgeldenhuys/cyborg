@@ -4,6 +4,7 @@ import android.database.sqlite.{SQLiteDatabase => ASQLD, SQLiteDatabaseLockedExc
 import android.database.{Cursor => AC}
 import android.content.ContentValues
 import scala.annotation.tailrec
+import cyborg.util.control._
 
 object SQLite {
   type StringOrBlob = Either[String, Array[Byte]]
@@ -221,11 +222,13 @@ object SQLite {
     }
 
     def get[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
-      if (cursor.getCount > 0) {
-        if (cursor.isBeforeFirst) cursor.moveToNext()
-        getter.get(cursor, cursor.getColumnIndex(columnName))
-      }
-      else None
+      tryOption {
+        if (cursor.getCount > 0) {
+          if (cursor.isBeforeFirst) cursor.moveToNext()
+          getter.get(cursor, cursor.getColumnIndex(columnName))
+        }
+        else None
+      } .flatten
     }
 
     def getAndClose[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
