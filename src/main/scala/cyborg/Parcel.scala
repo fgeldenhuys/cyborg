@@ -1,13 +1,22 @@
 package cyborg
 
-import android.os.{Parcel => P}
-import cyborg.util.control._
+import android.os.{Parcel => P, ParcelFormatException}
+import scalaz._, Scalaz._
 
 object Parcel {
   implicit class CyborgParcelExt(val p: P) extends AnyVal {
-    def read[T](implicit t: ParcelValue[T]): Option[T] = tryOption(t read p)
-    def write[T](value: T)(implicit t: ParcelValue[T]): Option[P] = tryOption { t.write(p, value); p }
-    def check[T](expected: T)(implicit t: ParcelValue[T]): Boolean = tryOption(t.read(p) == expected) getOrElse false
+    def read[T](implicit t: ParcelValue[T]): Throwable \/ T =
+      \/.fromTryCatch(t read p)
+    def write[T](value: T)(implicit t: ParcelValue[T]): P = {
+      t.write(p, value)
+      p
+    }
+    def check[T](expected: T)(implicit t: ParcelValue[T]): Throwable \/ T =
+      \/.fromTryCatch {
+        val value = t read p
+        if (value != expected) throw new ParcelFormatException(s"Expected '$expected' from parcel but got '$value'")
+        value
+      }
   }
 
   trait ParcelValue[T] {

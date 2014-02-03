@@ -27,7 +27,7 @@ object io {
     multiSlashRegex.replaceAllIn(result, "/")
   }
 
-  def File(path: String) = tryOption(new File(path))
+  def openFile(path: String) = tryOption(new File(path))
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
     val buf = new Array[Byte](BufferSize)

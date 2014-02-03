@@ -23,7 +23,7 @@ object control {
     try {
       Option(f)
     } catch {
-      case e =>
+      case e: Throwable =>
         e.printStackTrace()
         None
     }
