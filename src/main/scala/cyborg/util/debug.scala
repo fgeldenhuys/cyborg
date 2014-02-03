@@ -27,6 +27,16 @@ object debug {
     $d("Memory Usage: Pss=" + meminfo.getTotalPss + " Private=" + meminfo.getTotalPrivateDirty + " Shared=" + meminfo.getTotalSharedDirty())
   }
 
+  case class MemoryUsageValues(pss: Bytes, priv: Bytes, shared: Bytes)
+
+  def getMemoryUsage: MemoryUsageValues = {
+    val meminfo = new Debug.MemoryInfo
+    Debug.getMemoryInfo(meminfo)
+    MemoryUsageValues(Bytes(meminfo.getTotalPss * 1024),
+      Bytes(meminfo.getTotalPrivateDirty * 1024),
+      Bytes(meminfo.getTotalSharedDirty * 1024))
+  }
+
   def killRAM() {
     val MB16 = 16 * 1024 * 1024
     val junk = mutable.ListBuffer.empty[Array[Byte]]
@@ -37,9 +47,9 @@ object debug {
       val meminfo = new Debug.MemoryInfo
       Debug.getMemoryInfo(meminfo)
       val wasted = Bytes(junk.length * MB16)
-      val pss = Bytes(meminfo.getTotalPss)
-      val priv = Bytes(meminfo.getTotalPrivateDirty)
-      val shared = Bytes(meminfo.getTotalSharedDirty)
+      val pss = Bytes(meminfo.getTotalPss * 1024)
+      val priv = Bytes(meminfo.getTotalPrivateDirty * 1024)
+      val shared = Bytes(meminfo.getTotalSharedDirty * 1024)
       $d(s"$wasted wasted, pss=$pss private=$priv shared=$shared")
     }
   }
