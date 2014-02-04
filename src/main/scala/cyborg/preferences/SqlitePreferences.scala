@@ -25,13 +25,13 @@ object SqlitePreferences {
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
       tryOption {
         helper.readableDatabase(db => prop.get(db, section, key)) orElse androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key))
-      } .flatten
+      } .flatMap(identity)
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
       tryOption {
         helper.writableDatabase(db => prop.put(db, section, key, value))
-      } .flatten
+      }
     }
 
     def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
@@ -45,7 +45,7 @@ object SqlitePreferences {
         helper.writableDatabase { db =>
           db.delete("prime", "section = ? AND key = ?", section, key)
         }
-      } .flatten
+      }
     }
 
     def setOrDelete[T](key: String, value: Option[T])(implicit prop: PrefProp[T]) {
@@ -59,7 +59,7 @@ object SqlitePreferences {
     def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
       tryOption {
         helper.writableDatabase(db => prop.increment(db, section, key))
-      } .flatten
+      } .flatMap(identity)
     }
 
     class PrefSet(val key: String) {
