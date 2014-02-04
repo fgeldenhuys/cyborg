@@ -5,6 +5,7 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.db.SQLite._
 import android.content.SharedPreferences
 import scala.util.Try
+import cyborg.util.control._
 
 object SqlitePreferences {
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
@@ -22,21 +23,29 @@ object SqlitePreferences {
     }
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      helper.readableDatabase(db => prop.get(db, section, key)) orElse androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key))
+      tryOption {
+        helper.readableDatabase(db => prop.get(db, section, key)) orElse androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key))
+      } .flatten
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
-      helper.writableDatabase(db => prop.put(db, section, key, value))
+      tryOption {
+        helper.writableDatabase(db => prop.put(db, section, key, value))
+      } .flatten
     }
 
     def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
-      helper.readableDatabase(db => prop.?(db, section, key))
+      tryOption {
+        helper.readableDatabase(db => prop.?(db, section, key))
+      } .getOrElse(false)
     }
 
     def delete(key: String) {
-      helper.writableDatabase { db =>
-        db.delete("prime", "section = ? AND key = ?", section, key)
-      }
+      tryOption {
+        helper.writableDatabase { db =>
+          db.delete("prime", "section = ? AND key = ?", section, key)
+        }
+      } .flatten
     }
 
     def setOrDelete[T](key: String, value: Option[T])(implicit prop: PrefProp[T]) {
@@ -47,8 +56,11 @@ object SqlitePreferences {
       if (apply[T](key).isEmpty) update[T](key, value)
     }
 
-    def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] =
-      helper.writableDatabase(db => prop.increment(db, section, key))
+    def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
+      tryOption {
+        helper.writableDatabase(db => prop.increment(db, section, key))
+      } .flatten
+    }
 
     class PrefSet(val key: String) {
       def += [T](value: T)(implicit prop: PrefProp[T]) {
