@@ -3,11 +3,12 @@ package cyborg.util
 import android.hardware.usb.{UsbEndpoint, UsbDeviceConnection}
 import cyborg.util.binary._
 import cyborg.util.control._
+import cyborg.util.execution.ScheduledExecutionContext
 import java.io._
 import java.nio.ByteBuffer
 import scala.concurrent._
 import scala.concurrent.duration.Duration
-import cyborg.util.execution.ScheduledExecutionContext
+import scalaz._, Scalaz._
 
 object io {
   val BufferSize = 1024
@@ -148,9 +149,9 @@ object io {
 
     def readString: String = new String(read, "UTF-8")
 
-    def unzipStream(path: String): Option[InputStream] = {
+    def unzipStream(path: String): Throwable \/ InputStream = \/.fromTryCatch {
       val zip = new java.util.zip.ZipFile(file)
-      Option(zip.getEntry(path)) map zip.getInputStream
+      zip.getInputStream(zip.getEntry(path))
     }
 
     def sha1: Array[Byte] = read.sha1
