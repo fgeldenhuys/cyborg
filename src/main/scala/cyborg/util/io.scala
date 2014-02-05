@@ -149,6 +149,16 @@ object io {
 
     def readString: String = new String(read, "UTF-8")
 
+    def checkZipFile: Boolean = {
+      try {
+        new java.util.zip.ZipFile(file)
+        true
+      }
+      catch {
+        case e: Throwable => false
+      }
+    }
+
     def unzipStream(path: String): Throwable \/ InputStream = \/.fromTryCatch {
       val zip = new java.util.zip.ZipFile(file)
       zip.getInputStream(zip.getEntry(path))
