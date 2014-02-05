@@ -149,7 +149,7 @@ object io {
 
     def readString: String = new String(read, "UTF-8")
 
-    def checkZipFile: Boolean = {
+    def validZipFile: Boolean = {
       try {
         new java.util.zip.ZipFile(file)
         true
