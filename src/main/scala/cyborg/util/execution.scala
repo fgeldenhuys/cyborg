@@ -4,7 +4,7 @@ import cyborg.Context._
 import android.os.Handler
 import scala.concurrent._
 import scala.concurrent.duration._
-import java.util.concurrent.{ScheduledThreadPoolExecutor, ScheduledFuture, TimeUnit}
+import java.util.concurrent.{ScheduledThreadPoolExecutor, ScheduledFuture => SF, TimeUnit}
 import cyborg.Log._
 
 object execution {
@@ -28,6 +28,8 @@ object execution {
     def reportFailure(t: Throwable) { ec.reportFailure(t) }
   }
 
+  case class ScheduledFuture[T](future: Future[T], scheduled: SF[_])
+
   case class CancelledExecution(message: String) extends Exception(message)
 
   class ExecuteWrapper[T](val fun: () => T,
@@ -46,7 +48,7 @@ object execution {
     // Runs original function, and tries to kill it if it runs longer than d and returns.
     def within(d: Duration)(implicit sec: ScheduledExecutionContext): Future[T] = {
       val p = promise[T]
-      var scheduledCancel: Option[ScheduledFuture[_]] = None
+      var scheduledCancel: Option[SF[_]] = None // To cancel the timeout sentinel
       val sf = sec.schedule({
         val result = fun()
         afterwardsFun.map(_())
@@ -64,18 +66,18 @@ object execution {
       p.future
     }
 
-    def afterDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): Future[T] = {
+    def afterDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): ScheduledFuture[T] = {
       val p = promise[T]
-      sec.schedule({
+      val s = sec.schedule({
         val result = fun()
         afterwardsFun.map(_())
         p success result
       }, d.toMillis, TimeUnit.MILLISECONDS)
-      p.future
+      ScheduledFuture[T](p.future, s)
     }
 
     // Run immediately and then repeatedly with delay of d in between executions. The result is lost.
-    def repeatedWithDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): ScheduledFuture[_] = {
+    def repeatedWithDelayOf(d: Duration)(implicit sec: ScheduledExecutionContext): SF[_] = {
       sec.scheduleWithFixedDelay({
         fun()
       }, 0, d.toMillis, TimeUnit.MILLISECONDS)
