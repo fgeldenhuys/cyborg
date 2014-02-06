@@ -115,7 +115,7 @@ object execution {
   }
 
   class ExecutionTimer(val start: Long) {
-    def apply() = systemTime - start
+    def apply(): Duration = (systemTime - start) milliseconds
   }
   def startTimer = new ExecutionTimer(systemTime)
 
