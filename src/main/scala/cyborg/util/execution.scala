@@ -1,11 +1,12 @@
 package cyborg.util
 
-import cyborg.Context._
 import android.os.Handler
+import cyborg.Context._
+import cyborg.Log._
+import java.util.concurrent.{ScheduledThreadPoolExecutor, ScheduledFuture => SF, TimeUnit}
+import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
-import java.util.concurrent.{ScheduledThreadPoolExecutor, ScheduledFuture => SF, TimeUnit}
-import cyborg.Log._
 
 object execution {
   implicit def fun2runnable(f: => Any): Runnable = new Runnable { def run() { f } }
@@ -114,9 +115,41 @@ object execution {
     }
   }
 
-  class ExecutionTimer(val start: Long) {
-    def apply(): Duration = (systemTime - start) milliseconds
-  }
-  def startTimer = new ExecutionTimer(systemTime)
+  class ExecutionTimer(val start: Long, val name: String) {
+    var lastCheckpoint: Long = start
+    lazy val averageTimes = mutable.HashMap.empty[String, (Int, Long)]
 
+    def apply(): Duration = (systemTime - start).milliseconds
+
+    def checkpoint(message: String): Duration = {
+      val now = systemTime
+      val t = now - start
+      val split = now - lastCheckpoint
+      lastCheckpoint = now
+      $d(s"$name +$t ($split) $message")
+      split.milliseconds
+    }
+
+    def averageCheckpoint(message: String): Duration = {
+      val now = systemTime
+      val split = now - lastCheckpoint
+      lastCheckpoint = now
+      val (n, t) = averageTimes.get(message) getOrElse (0, 0l)
+      averageTimes(message) = (n + 1, t + split)
+      split.milliseconds
+    }
+
+    def averageReport: String =
+      (for ((message, (n, time)) <- averageTimes.toMap) yield
+        s"$message \t $time / $n = ${time / n} ms").mkString("\n")
+
+    def silentCheckpoint: Duration = {
+      val now = systemTime
+      val split = now - lastCheckpoint
+      lastCheckpoint = now
+      split.milliseconds
+    }
+
+  }
+  def startTimer(name: String = "TIMER") = new ExecutionTimer(systemTime, name)
 }

@@ -2,13 +2,16 @@ package cyborg.net
 
 import cyborg.net.Http._
 import cyborg.net.Http.HttpParameters
+import cyborg.net.Http.HttpParameters
+import cyborg.net.Http.SimpleHttpResult
 import cyborg.net.Http.SimpleHttpResult
 import cyborg.util.binary._
 import cyborg.util.execution._
+import cyborg.util.execution.CancelledExecution
 import cyborg.util.io._
 import cyborg.util.control._
 import java.io._
-import java.net.{CookieHandler, CookieManager, HttpURLConnection}
+import java.net._
 import javax.net.ssl.SSLSocketFactory
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.utils.URLEncodedUtils
@@ -17,6 +20,9 @@ import scala.collection.JavaConversions._
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.Some
+import scala.Some
+import scala.concurrent.promise
+import scala.concurrent.future
 
 trait Http {
   import cyborg.Log._
@@ -42,16 +48,18 @@ trait Http {
           SimpleHttpResult(code, content)
         }
         catch {
+          case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+            $d(s"${e.getClass} caught for '$url': $e")
+            SimpleHttpResult(-1, e.getMessage)
           case e: FileNotFoundException =>
-            //val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$fullUrl'")
-            SimpleHttpResult(responseCode, "")//errorContent)
+            SimpleHttpResult(responseCode, "Resource not found")
           case e: IOException =>
-            //val errorContent = read(http.getErrorStream)
+            val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$fullUrl'")
-            SimpleHttpResult(responseCode, "")//errorContent)
+            SimpleHttpResult(responseCode, errorContent)
         }
     }
   }
@@ -83,25 +91,27 @@ trait Http {
             p success SimpleHttpResult(code, content)
           }
           catch {
+            case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+              $d(s"${e.getClass} caught for '$url': $e")
+              p success SimpleHttpResult(-1, e.getMessage)
             case e: FileNotFoundException =>
-              $d("FileNotFoundException caught")
+              $d(s"${e.getClass} caught")
               execute {
-                //val errorContent = read(http.getErrorStream)
                 val responseCode = http.getResponseCode
                 $w(s"$responseCode $e for '$url'")
-                p success SimpleHttpResult(responseCode, "")//errorContent)
+                p success SimpleHttpResult(responseCode, "Resource not found")
               } within (5 seconds) recover {
                 case CancelledExecution(message) =>
                   $w(s"Timeout getting error content for '$url'")
                   p success SimpleHttpResult(-1, message)
               }
             case e: IOException =>
-              $d(s"IOException caught for '$url': $e")
+              $d(s"${e.getClass} caught for '$url': $e")
               execute {
-                //val errorContent = read(http.getErrorStream)
+                val errorContent = read(http.getErrorStream)
                 val responseCode = http.getResponseCode
                 $w(s"$responseCode $e for '$url'")
-                p success SimpleHttpResult(responseCode, "")//errorContent)
+                p success SimpleHttpResult(responseCode, errorContent)
               } within (5 seconds) recover {
                 case CancelledExecution(message) =>
                   $w(s"Timeout getting error content for '$url'")
@@ -128,16 +138,18 @@ trait Http {
           SimpleHttpResult(code, content)
         }
         catch {
+          case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+            $d(s"${e.getClass} caught for '$url': $e")
+            SimpleHttpResult(-1, e.getMessage)
           case e: FileNotFoundException =>
-            //val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$url'")
-            SimpleHttpResult(responseCode, "")//errorContent)
+            SimpleHttpResult(responseCode, "Resource not found")
           case e: IOException =>
-            //val errorContent = read(http.getErrorStream)
+            val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$url'")
-            SimpleHttpResult(responseCode, "")//errorContent)
+            SimpleHttpResult(responseCode, errorContent)
         }
     }
   }
@@ -166,16 +178,18 @@ trait Http {
           SimpleHttpResult(code, content)
         }
         catch {
+          case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+            $d(s"${e.getClass} caught for '$url': $e")
+            SimpleHttpResult(-1, e.getMessage)
           case e: FileNotFoundException =>
-            //val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$fullUrl'")
-            SimpleHttpResult(responseCode, "")//errorContent)
+            SimpleHttpResult(responseCode, "Resource not found")
           case e: IOException =>
-            //val errorContent = read(http.getErrorStream)
+            val errorContent = read(http.getErrorStream)
             val responseCode = http.getResponseCode
             $w(s"$responseCode $e for '$fullUrl'")
-            SimpleHttpResult(responseCode, "")//errorContent)
+            SimpleHttpResult(responseCode, errorContent)
         }
     }
   }
@@ -211,10 +225,13 @@ trait Http {
               m success SimpleHttpResult(code, "")
           }
           catch {
+            case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+              $d(s"${e.getClass} caught for '$url': $e")
+              m failure SimpleHttpResult(-1, e.getMessage)
             case e: FileNotFoundException =>
               val responseCode = http.getResponseCode
               $w(s"$responseCode $e for '$fullUrl'")
-              m failure SimpleHttpResult(responseCode, "")
+              m failure SimpleHttpResult(responseCode, "Resource not found")
             case e: IOException =>
               val responseCode = http.getResponseCode
               $w(s"$responseCode $e for '$fullUrl'")

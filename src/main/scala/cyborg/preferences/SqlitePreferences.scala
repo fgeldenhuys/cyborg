@@ -1,11 +1,11 @@
 package cyborg.preferences
 
-import cyborg.Context, cyborg.Context._
-import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
-import cyborg.db.SQLite._
 import android.content.SharedPreferences
-import scala.util.Try
+import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
+import cyborg.Context, cyborg.Context._
+import cyborg.db.SQLite._
 import cyborg.util.control._
+import scalaz._, Scalaz._
 
 object SqlitePreferences {
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
@@ -14,34 +14,35 @@ object SqlitePreferences {
   class Preferences(val section: String, val androidPrefsSection: String)(implicit val context: Context) {
     val helper = new DbOpenHelper
     val androidPrefs: Option[SharedPreferences] = {
-        assert(context != null)
-        assert(context.c != null)
-        assert(androidPrefsSection != null)
-      Try {
+      assert(context != null)
+      assert(context.c != null)
+      assert(androidPrefsSection != null)
+      tryOption {
         Option(context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess))
-      } .toOption.flatten
+      }.flatten
     }
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      tryOption {
-        helper.readableDatabase(db => prop.get(db, section, key)) orElse androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key))
-      } .flatMap(identity)
+      retryOnException[Option[T]](3) {
+        helper.readableDatabase(db => prop.get(db, section, key))
+          .orElse(androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key)))
+      } .toOption.flatten
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
-      tryOption {
+      retryOnException[Any](3) {
         helper.writableDatabase(db => prop.put(db, section, key, value))
       }
     }
 
     def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
-      tryOption {
+      retryOnException[Boolean](3) {
         helper.readableDatabase(db => prop.?(db, section, key))
       } .getOrElse(false)
     }
 
     def delete(key: String) {
-      tryOption {
+      retryOnException[Any](3) {
         helper.writableDatabase { db =>
           db.delete("prime", "section = ? AND key = ?", section, key)
         }

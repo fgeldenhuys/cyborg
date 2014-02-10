@@ -1,10 +1,12 @@
 package cyborg.util
 
 import cyborg.util.execution.ScheduledExecutionContext
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 import scala.util.control.Exception._
 import scala.util.{Failure, Success}
+import scalaz._, Scalaz._
 
 object control {
   implicit class OptionExt[A](val x: Option[A]) extends AnyVal {
@@ -30,6 +32,24 @@ object control {
   }
 
   def tryElse[T](f: => T)(e: Exception => T) = handling(classOf[Exception])
+
+  def retryOnException[T](times: Int)(f: => T): Throwable \/ T =
+    retryOnExceptionHelper(times, () => f)
+
+  @tailrec private def retryOnExceptionHelper[T](times: Int, f: () => T): Throwable \/ T = {
+    val result = try {
+      \/-(f())
+    }
+    catch {
+      case e: Throwable =>
+        if (times <= 0) e.printStackTrace()
+        -\/(e)
+    }
+    if (result.isLeft && times > 0)
+      retryOnExceptionHelper(times - 1, f)
+    else
+      result
+  }
 
   case class NotImplemented(message: String = "Not implemented") extends Exception(message)
   case class BreakException() extends Exception
