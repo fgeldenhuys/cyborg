@@ -128,9 +128,9 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
             }
           }
         }
-        else if(sources.contains(message.sourceId) && (message.lineNumber-1) < sources(message.sourceId).size) {
+        /*else if(sources.contains(message.sourceId) && (message.lineNumber-1) < sources(message.sourceId).size) {
           $d(source + ":" + message.lineNumber() + ": " + sources(message.sourceId)(message.lineNumber-1))
-        }
+        }*/
       }
 
       true

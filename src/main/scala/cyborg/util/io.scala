@@ -128,6 +128,8 @@ object io {
   }
 
   implicit class FileCyborgExt(val file: File) extends AnyVal {
+    def name = file.getName
+
     def read: Array[Byte] = {
       val fileSize = file.length().toInt
       if (fileSize > MaxBufferSize)
@@ -149,6 +151,15 @@ object io {
 
     def readString: String = new String(read, "UTF-8")
 
+    def write(data: Array[Byte]): Throwable \/ File = \/.fromTryCatch {
+      val out = new BufferedOutputStream(new FileOutputStream(file))
+      out.write(data)
+      out.close()
+      file
+    }
+
+    def writeString(data: String): Throwable \/ File = write(data.getBytes("UTF-8"))
+
     def validZipFile: Boolean = {
       try {
         new java.util.zip.ZipFile(file)
@@ -166,6 +177,8 @@ object io {
 
     def sha1: Array[Byte] = read.sha1
     def sha1Sample(bytes: Int): Array[Byte] = readBytes(bytes).sha1
+
+    def ls: List[File] = Option(file.listFiles().toList) getOrElse List.empty
   }
 
   implicit class ByteArrayCyborgIOExt(val data: Array[Byte]) extends AnyVal {
