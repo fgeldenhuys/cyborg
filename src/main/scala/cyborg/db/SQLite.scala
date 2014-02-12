@@ -67,6 +67,7 @@ object SQLite {
       }
       finally {
         db.endTransaction()
+        db.close()
       }
     }
 
