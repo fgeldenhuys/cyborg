@@ -24,26 +24,26 @@ object SqlitePreferences {
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
       retryOnException[Option[T]](3) {
-        helper.readableDatabase(db => prop.get(db, section, key))
+        helper.readableDatabase.toOption.flatMap(db => prop.get(db, section, key))
           .orElse(androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key)))
       } .toOption.flatten
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
       retryOnException[Any](3) {
-        helper.writableDatabase(db => prop.put(db, section, key, value))
+        helper.writableDatabase.map(db => prop.put(db, section, key, value))
       }
     }
 
     def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
       retryOnException[Boolean](3) {
-        helper.readableDatabase(db => prop.?(db, section, key))
+        helper.readableDatabase.map(db => prop.?(db, section, key)).getOrElse(false)
       } .getOrElse(false)
     }
 
     def delete(key: String) {
       retryOnException[Any](3) {
-        helper.writableDatabase { db =>
+        helper.writableDatabase.map { db =>
           db.delete("prime", "section = ? AND key = ?", section, key)
         }
       }
@@ -59,21 +59,21 @@ object SqlitePreferences {
 
     def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
       tryOption {
-        helper.writableDatabase(db => prop.increment(db, section, key))
+        helper.writableDatabase.toOption.flatMap(db => prop.increment(db, section, key))
       } .flatMap(identity)
     }
 
     class PrefSet(val key: String) {
       def += [T](value: T)(implicit prop: PrefProp[T]) {
-        helper.writableDatabase(db => prop.setAdd(db, section, key, value))
+        helper.writableDatabase.map(db => prop.setAdd(db, section, key, value))
       }
 
       def -= [T](value: T)(implicit prop: PrefProp[T]) {
-        helper.writableDatabase(db => prop.setRemove(db, section, key, value))
+        helper.writableDatabase.map(db => prop.setRemove(db, section, key, value))
       }
 
       def delete() {
-        helper.writableDatabase.transaction { db =>
+        helper.writableDatabase.map(_.transaction { db =>
           val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
           if (check.isEmpty) // Nothing there
             throw KeyNotDefinedException(section, key)
@@ -85,11 +85,11 @@ object SqlitePreferences {
               db.delete("prime", "section = ? AND key = ?", section, key)
             }
           }
-        }
+        })
       }
 
       def toList[T](implicit prop: PrefProp[T]): List[T] = {
-        helper.readableDatabase(db => prop.setGet(db, section, key))
+        helper.readableDatabase.map(db => prop.setGet(db, section, key)).getOrElse(List.empty)
       }
       def toSet[T](implicit prop: PrefProp[T]): Set[T] = toList[T](prop).toSet
     }

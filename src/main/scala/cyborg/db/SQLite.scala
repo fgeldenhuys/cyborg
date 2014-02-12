@@ -5,9 +5,14 @@ import android.database.{Cursor => AC}
 import android.content.ContentValues
 import scala.annotation.tailrec
 import cyborg.util.control._
+import cyborg.util.execution._
+import cyborg.Log._
+import scalaz._, Scalaz._
 
 object SQLite {
   type StringOrBlob = Either[String, Array[Byte]]
+  val TooLongOperation = 1000l
+  val DefaultCutoff = 1000l
 
   case class FailTransaction() extends Exception
   def failTransaction() { throw FailTransaction() }
@@ -43,16 +48,22 @@ object SQLite {
 
   implicit class Database(val db: ASQLD) extends AnyVal {
     def apply[T](f: (ASQLD) => T): T = {
+      val before = systemTime
       val result = f(db)
+      val dtime = systemTime - before
       db.close()
+      if (dtime > TooLongOperation) {
+        $w(s"WARNING Database operation took $dtime milliseconds")
+        cyborg.util.debug.printStackTrace()
+      }
       result
     }
 
     def raw(sql: String, args: String*) = db.rawQuery(sql, args.toArray)
     def exec(sql: String, args: String*) = db.execSQL(sql, args.toArray)
 
-    // TODO: maybe make transaction also close db at the end like apply
     def transaction[T](f: (ASQLD) => T): Option[T] = {
+      val before = systemTime
       try {
         db.beginTransaction()
         try {
@@ -66,8 +77,12 @@ object SQLite {
         }
       }
       finally {
+        val dtime = systemTime - before
         db.endTransaction()
-        db.close()
+        if (dtime > TooLongOperation) {
+          $w(s"WARNING Database transaction took $dtime milliseconds")
+          cyborg.util.debug.printStackTrace()
+        }
       }
     }
 
@@ -164,34 +179,39 @@ object SQLite {
   implicit class OpenHelper(val oh: SQLiteOpenHelper) extends AnyVal {
     import cyborg.Log._
 
-    // TODO: the cancel timeout thing is broken
-    // def readableDatabase(tryUntil: Long = 0): ASQLD = {
-    //  val cancel = if (tryUntil == 0) System.currentTimeMillis() + 1000 else tryUntil
-    def readableDatabase: ASQLD = {
-      val cancel = System.currentTimeMillis() + 1000
+    def readableDatabase: Throwable \/ ASQLD = readableDatabaseHelper(systemTime + DefaultCutoff)
+
+    /*@tailrec*/ private def readableDatabaseHelper(cutoff: Long): Throwable \/ ASQLD = {
       try {
-        oh.getReadableDatabase
+        \/-(oh.getReadableDatabase)
       }
       catch {
         case e: SQLiteDatabaseLockedException =>
-          if (System.currentTimeMillis() > cancel) throw e
           $w("Waiting for locked database: " + e.getMessage)
           try { Thread.sleep(10) } catch { case e: InterruptedException => }
-          readableDatabase
+          if (systemTime >= cutoff) -\/(e)
+          else readableDatabaseHelper(cutoff)
+        case e: Throwable =>
+          e.printStackTrace()
+          -\/(e)
       }
     }
 
-    def writableDatabase: ASQLD = {
-      val cancel = System.currentTimeMillis() + 1000
+    def writableDatabase: Throwable \/ ASQLD = writableDatabaseHelper(systemTime + DefaultCutoff)
+
+    /*@tailrec*/ private def writableDatabaseHelper(cutoff: Long): Throwable \/ ASQLD = {
       try {
-        oh.getWritableDatabase
+        \/-(oh.getWritableDatabase)
       }
       catch {
         case e: SQLiteDatabaseLockedException =>
-          if (System.currentTimeMillis() > cancel) throw e
           $w("Waiting for locked database: " + e.getMessage)
           try { Thread.sleep(10) } catch { case e: InterruptedException => }
-          writableDatabase
+          if (systemTime >= cutoff) -\/(e)
+          else writableDatabaseHelper(cutoff)
+        case e: Throwable =>
+          e.printStackTrace()
+          -\/(e)
       }
     }
   }
