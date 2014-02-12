@@ -13,4 +13,6 @@ object resources {
                (implicit context: Context): A =
       context.systemService[LayoutInflater].inflate(id, root, attach).asInstanceOf[A]
   }
+
+  case class BitmapResource(id: Int)
 }
