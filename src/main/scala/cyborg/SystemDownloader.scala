@@ -16,6 +16,7 @@ import java.io.File
 import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.duration._
+import scala.concurrent._
 
 class SystemDownloader(
                         val onSuccess: (String) => Any,
@@ -32,10 +33,12 @@ class SystemDownloader(
 
   val onDownloadComplete = new BroadcastReceiver {
     def onReceive(androidContext: android.content.Context, intent: android.content.Intent) {
-      $d("Downloads:\n" + downloads.mkString("\n"))
-      checkFailed
-      checkSuccessful
-      bump
+      future {
+        $d("Downloads:\n" + downloads.mkString("\n"))
+        checkFailed
+        checkSuccessful
+        bump
+      }
     }
   }
 
