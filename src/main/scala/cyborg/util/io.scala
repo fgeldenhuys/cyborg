@@ -28,7 +28,7 @@ object io {
     multiSlashRegex.replaceAllIn(result, "/")
   }
 
-  def openFile(path: String) = tryOption(new File(path))
+  def openFile(path: String) = Option(new File(path))
   def openExistingFile(path: String) = openFile(path).filter(_.exists())
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
