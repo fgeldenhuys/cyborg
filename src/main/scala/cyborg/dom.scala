@@ -7,15 +7,12 @@ import cyborg.util.control._
 object dom {
 
   implicit class DomNodeExt(val node: Node) extends AnyVal {
-    def attribute(name: String): Option[String] = {
-      tryOption {
-        for {
-          elementAttributes <- Option(node.getAttributes)
-          idAttribute <- Option(elementAttributes.getNamedItem(name))
-          value <- Option(idAttribute.getNodeValue)
-        } yield value
-      } .flatMap(identity)
-    }
+    def attribute(name: String): Option[String] =
+      for {
+        elementAttributes <- Option(node.getAttributes)
+        idAttribute <- Option(elementAttributes.getNamedItem(name))
+        value <- Option(idAttribute.getNodeValue)
+      } yield value
 
     def name: Option[String] = tryOption(node.getNodeName)
     def value: Option[String] = tryOption(node.getNodeValue)
