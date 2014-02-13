@@ -56,20 +56,30 @@ object Activity {
     t
   }
 
+  def alert(title: String, message: String)(implicit context: Context): Future[Boolean] = {
+    val p = promise[Boolean]
+    val dialog = new AlertDialog.Builder(context)
+    dialog.setTitle(title).setMessage(message)
+    dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
+      def onClick(dialog: DialogInterface, button: Int) { p success true }
+    })
+    dialog.show()
+    p.future
+  }
+
   def prompt(title: String, message: String)(implicit context: Context): Future[Option[String]] = {
-    val p = promise[Option[String]]()
-    val alert = new AlertDialog.Builder(context)
-    alert.setTitle(title)
-    alert.setMessage(message)
+    val p = promise[Option[String]]
+    val dialog = new AlertDialog.Builder(context)
+    dialog.setTitle(title).setMessage(message)
     val input = new EditText(context)
-    alert.setView(input)
-    alert.setPositiveButton("Ok", new DialogInterface.OnClickListener {
+    dialog.setView(input)
+    dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
       def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
     })
-    alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
+    dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
       def onClick(dialog: DialogInterface, button: Int) { p success None }
     })
-    alert.show()
+    dialog.show()
     p.future
   }
 

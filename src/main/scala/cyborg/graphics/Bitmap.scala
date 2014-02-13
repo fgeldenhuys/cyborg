@@ -1,7 +1,8 @@
 package cyborg.graphics
 
 import android.graphics.{Bitmap => B, BitmapFactory => BF}
-import java.io.ByteArrayOutputStream
+import java.io.{InputStream, File, ByteArrayOutputStream}
+import cyborg.util.control._
 
 object Bitmap {
   object BitmapFormat {
@@ -23,5 +24,7 @@ object Bitmap {
     }
   }
 
-  def makeBitmap(bytes: Array[Byte]): Option[B] = Option(BF.decodeByteArray(bytes, 0, bytes.length))
+  def makeBitmap(bytes: Array[Byte]): Option[B] = tryOption(BF.decodeByteArray(bytes, 0, bytes.length))
+  def makeBitmap(file: File): Option[B] = tryOption(BF.decodeFile(file.getAbsolutePath))
+  def makeBitmap(in: InputStream): Option[B] = tryOption(BF.decodeStream(in))
 }

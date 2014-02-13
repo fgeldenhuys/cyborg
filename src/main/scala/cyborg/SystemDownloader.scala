@@ -32,7 +32,6 @@ class SystemDownloader(
 
   val onDownloadComplete = new BroadcastReceiver {
     def onReceive(androidContext: android.content.Context, intent: android.content.Intent) {
-      $d("A download has completed")
       $d("Downloads:\n" + downloads.mkString("\n"))
       checkFailed
       checkSuccessful
