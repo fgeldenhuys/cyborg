@@ -2,6 +2,7 @@ package cyborg
 
 import cyborg.Context.Context
 import android.view.{LayoutInflater, ViewGroup}
+import android.graphics.{BitmapFactory, Bitmap}
 
 object resources {
   // [A <: android.view.View] would be nice... :/
@@ -14,5 +15,32 @@ object resources {
       context.systemService[LayoutInflater].inflate(id, root, attach).asInstanceOf[A]
   }
 
-  case class BitmapResource(id: Int)
+  trait Resource[T] {
+    def id: Int
+    def apply()(implicit context: Context): T
+  }
+
+  case class BitmapResource(id: Int) extends Resource[Bitmap] {
+    def apply()(implicit context: Context): Bitmap = BitmapFactory.decodeResource(context.resources, id)
+  }
+
+  case class StringResource(id: Int) extends Resource[String] {
+    def apply()(implicit context: Context): String = context.resources.getString(id)
+  }
+
+  trait ResourceGetter[T] {
+    def apply(id: Int): Resource[T]
+  }
+
+  implicit val bitmapResourceGetter = new ResourceGetter[Bitmap] {
+    override def apply(id: Int): Resource[Bitmap] = BitmapResource(id)
+
+  }
+
+  implicit val stringResourceGetter = new ResourceGetter[String] {
+    override def apply(id: Int): Resource[String] = StringResource(id)
+
+  }
+
+  def resource[T](id: Int)(implicit context: Context, resourceGetter: ResourceGetter[T]): Resource[T] = resourceGetter(id)
 }

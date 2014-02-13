@@ -1,8 +1,6 @@
 package cyborg.graphics
 
 import android.graphics.{Bitmap => B, BitmapFactory => BF}
-import cyborg.Context.Context
-import cyborg.resources.BitmapResource
 import java.io.{InputStream, File, ByteArrayOutputStream}
 import cyborg.util.control._
 
@@ -26,7 +24,6 @@ object Bitmap {
     }
   }
 
-  def makeBitmap(resource: BitmapResource)(implicit context: Context) = BF.decodeResource(context.resources, resource.id)
   def makeBitmap(bytes: Array[Byte]): Option[B] = tryOption(BF.decodeByteArray(bytes, 0, bytes.length))
   def makeBitmap(file: File): Option[B] = tryOption(BF.decodeFile(file.getAbsolutePath))
   def makeBitmap(in: InputStream): Option[B] = tryOption(BF.decodeStream(in))
