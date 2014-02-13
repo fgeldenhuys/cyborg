@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.{ParcelFileDescriptor, Environment}
 import cyborg.db.SQLite._
 import cyborg.Context._
+import cyborg.util.execution.ScheduledExecutionContext
 import Preferences._
 import cyborg.util.binary._
 import cyborg.util.concurrent._
@@ -21,7 +22,7 @@ import scala.concurrent._
 class SystemDownloader(
                         val onSuccess: (String) => Any,
                         val onFailure: (String) => Any
-                        )(implicit context: Context) {
+                        )(implicit context: Context, sec: ScheduledExecutionContext) {
   import SystemDownloader._
   import cyborg.Log._
 
