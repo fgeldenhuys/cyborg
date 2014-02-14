@@ -227,15 +227,15 @@ trait Http {
           catch {
             case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
               $d(s"${e.getClass} caught for '$url': $e")
-              m failure SimpleHttpResult(-1, e.getMessage)
+              m success SimpleHttpResult(-1, e.getMessage)
             case e: FileNotFoundException =>
               val responseCode = http.getResponseCode
               $w(s"$responseCode $e for '$fullUrl'")
-              m failure SimpleHttpResult(responseCode, "Resource not found")
+              m success SimpleHttpResult(responseCode, "Resource not found")
             case e: IOException =>
               val responseCode = http.getResponseCode
               $w(s"$responseCode $e for '$fullUrl'")
-              m failure SimpleHttpResult(responseCode, "")
+              m success SimpleHttpResult(responseCode, "")
           }
       }
     }

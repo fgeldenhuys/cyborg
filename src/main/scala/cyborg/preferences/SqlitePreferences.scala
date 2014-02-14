@@ -5,6 +5,7 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.Context, cyborg.Context._
 import cyborg.db.SQLite._
 import cyborg.util.control._
+import cyborg.Log._
 import scalaz._, Scalaz._
 
 object SqlitePreferences {
@@ -73,19 +74,26 @@ object SqlitePreferences {
       }
 
       def delete() {
-        helper.writableDatabase.map(_.transaction { db =>
-          val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-          if (check.isEmpty) // Nothing there
-            throw KeyNotDefinedException(section, key)
-          else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
-            throw NotASetException(section, key)
-          else {
-            check.get[Long]("value") map { setId =>
-              db.delete("sets", "section = ? AND setId = ?", section, setId)
-              db.delete("prime", "section = ? AND key = ?", section, key)
+        helper.writableDatabase.map {
+          _.transaction { db =>
+            val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
+            if (check.isEmpty) { // Nothing there
+              //throw KeyNotDefinedException(section, key)
+              $w("Key not defined! " + cyborg.util.debug.getStackTrace)
             }
+            else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+              //throw NotASetException(section, key)
+              $w("Not a set! " + cyborg.util.debug.getStackTrace)
+            }
+            else {
+              check.get[Long]("value") map { setId =>
+                db.delete("sets", "section = ? AND setId = ?", section, setId)
+                db.delete("prime", "section = ? AND key = ?", section, key)
+              }
+            }
+            check.close()
           }
-        })
+        }
       }
 
       def toList[T](implicit prop: PrefProp[T]): List[T] = {
@@ -188,10 +196,14 @@ object SqlitePreferences {
     def setRemove(db: SQLiteDatabase, section: String, key: String, value: T) {
       db.transaction { db =>
         val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-        if (check.isEmpty) // Nothing there
-          throw KeyNotDefinedException(section, key)
-        else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
-          throw NotASetException(section, key)
+        if (check.isEmpty) { // Nothing there
+          //throw KeyNotDefinedException(section, key)
+          $w("Key not defined! " + cyborg.util.debug.getStackTrace)
+        }
+        else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+          //throw NotASetException(section, key)
+          $w("Not a set! " + cyborg.util.debug.getStackTrace)
+        }
         else {
           check.get[Long]("value") map { setId =>
             db.delete("sets", "section = ? AND setId = ? AND value = ?", section, setId, value.toString)
@@ -206,8 +218,11 @@ object SqlitePreferences {
         val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
         val result = if (check.isEmpty) // Nothing there
           List.empty
-        else if (check.get[Int]("setValue").exists(_ == 0)) // Value defined, but not a set
-          throw NotASetException(section, key)
+        else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+          //throw NotASetException(section, key)
+          $w("Not a set! " + cyborg.util.debug.getStackTrace)
+          List.empty
+        }
         else {
           check.get[Long]("value") .map { setId =>
             db.raw("SELECT value FROM sets WHERE section = ? AND setId = ?", section, setId.toString)
