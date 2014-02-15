@@ -25,9 +25,23 @@ object binary {
 
     def toInt = bytes
     def toDouble = bytes.toDouble
+
+    def == (that: Bytes) = bytes == that.bytes
+    def < (that: Bytes) = bytes < that.bytes
+    def > (that: Bytes) = bytes > that.bytes
+    def <= (that: Bytes) = bytes <= that.bytes
+    def >= (that: Bytes) = bytes >= that.bytes
   }
 
   implicit def bytes2int(b: Bytes): Int = b.toInt
+
+  implicit class CyborgInt2BytesMethods(val i: Int) extends AnyVal {
+    def bytes = Bytes(i)
+    def KiB = Bytes(i * Bytes.KiB)
+    def MiB = Bytes(i * Bytes.MiB)
+    def GiB = Bytes(i * Bytes.GiB)
+    def TiB = Bytes(i * Bytes.TiB)
+  }
 
   implicit class BooleanCyborgExt(val value: Boolean) extends AnyVal {
     def toByte = if (value) 1.toByte else 0.toByte

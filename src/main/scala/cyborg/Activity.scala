@@ -58,28 +58,42 @@ object Activity {
 
   def alert(title: String, message: String)(implicit context: Context): Future[Boolean] = {
     val p = promise[Boolean]
-    val dialog = new AlertDialog.Builder(context)
-    dialog.setTitle(title).setMessage(message)
-    dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
-      def onClick(dialog: DialogInterface, button: Int) { p success true }
-    })
-    dialog.show()
+    try {
+      val dialog = new AlertDialog.Builder(context)
+      dialog.setTitle(title).setMessage(message)
+      dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int) { p success true }
+      })
+      dialog.show()
+    }
+    catch {
+      case e: Exception =>
+        e.printStackTrace()
+        p failure e
+    }
     p.future
   }
 
   def prompt(title: String, message: String)(implicit context: Context): Future[Option[String]] = {
     val p = promise[Option[String]]
-    val dialog = new AlertDialog.Builder(context)
-    dialog.setTitle(title).setMessage(message)
-    val input = new EditText(context)
-    dialog.setView(input)
-    dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
-      def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
-    })
-    dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
-      def onClick(dialog: DialogInterface, button: Int) { p success None }
-    })
-    dialog.show()
+    try {
+      val dialog = new AlertDialog.Builder(context)
+      dialog.setTitle(title).setMessage(message)
+      val input = new EditText(context)
+      dialog.setView(input)
+      dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
+      })
+      dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int) { p success None }
+      })
+      dialog.show()
+    }
+    catch {
+      case e: Exception =>
+        e.printStackTrace()
+        p failure e
+    }
     p.future
   }
 
