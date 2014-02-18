@@ -9,7 +9,8 @@ import android.widget.{EditText, Toast}
 import Context._
 import cyborg.util.events.Observable
 import scala.concurrent._
-import scala.collection.mutable
+import android.view.WindowManager.BadTokenException
+import cyborg.Log._
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -23,9 +24,15 @@ class Activity extends android.app.Activity {
   }
 
   def runOnUiThread(f: => Any) {
-    super.runOnUiThread(new Runnable {
-      def run() { f }
-    })
+    try {
+      super.runOnUiThread(new Runnable {
+        def run() { f }
+      })
+    } catch {
+      case e: BadTokenException =>
+        $w("runOnUiThread FAILED!")
+        e.printStackTrace()
+    }
   }
 
   def findView[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
