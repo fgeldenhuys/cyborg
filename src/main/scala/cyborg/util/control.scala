@@ -30,6 +30,13 @@ object control {
 
   def tryElse[T](f: => T)(e: Exception => T) = handling(classOf[Exception])
 
+  def tryEither[T](f: => T): Throwable \/ T = {
+    \/.fromTryCatch(f) match {
+      case \/-(null) => -\/(new NullPointerException())
+      case other => other
+    }
+  }
+
   def retryOnException[T](times: Int)(f: => T): Throwable \/ T =
     retryOnExceptionHelper(times, () => f)
 
