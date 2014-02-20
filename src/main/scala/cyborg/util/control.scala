@@ -25,7 +25,7 @@ object control {
     \/.fromTryCatch(f).fold(l => {
       l.printStackTrace
       None
-    }, Some(_))
+    }, Option(_))
   }
 
   def tryElse[T](f: => T)(e: Exception => T) = handling(classOf[Exception])
