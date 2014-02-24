@@ -5,7 +5,7 @@ import android.webkit
 import android.webkit.{DownloadListener, ConsoleMessage, MimeTypeMap}
 import cyborg.Context._
 import cyborg.Log._
-import cyborg.net.URIExt._
+import cyborg.net.URI
 import cyborg.util.control._
 import cyborg.util.execution._
 import cyborg.util.io._
@@ -89,9 +89,9 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
   }
 
   def url = getUrl
-  def urlPath: Option[String] = for (URIPath(path) <- URI(getUrl)) yield URLDecoder.decode(path, "UTF-8")
-  def urlQuery: Option[String] = for (URIQuery(query) <- URI(getUrl)) yield URLDecoder.decode(query, "UTF-8")
-  def urlFragment: Option[String] = for (URIFragment(ref) <- URI(getUrl)) yield URLDecoder.decode(ref, "UTF-8")
+  def urlPath: Option[String] = URI(getUrl).scheme.map(URLDecoder.decode(_, "UTF-8"))
+  def urlQuery: Option[String] = URI(getUrl).query.map(URLDecoder.decode(_, "UTF-8"))
+  def urlFragment: Option[String] = URI(getUrl).fragment.map(URLDecoder.decode(_, "UTF-8"))
   def urlDecoded: String = URLDecoder.decode(url, "UTF-8")
 
   def mimeType: Option[String] = {
@@ -113,11 +113,13 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
         URLDecoder.decode(message.sourceId)
       else
         message.sourceId
+
       message.messageLevel match {
         case ConsoleMessage.MessageLevel.ERROR => $e(source + ":" + message.lineNumber() + ": " + message.message())
         case ConsoleMessage.MessageLevel.WARNING => $w(source + ":" + message.lineNumber() + ": " + message.message())
         case _ => $d(source + ":" + message.lineNumber() + ": " + message.message())
       }
+
       if (message.messageLevel == ConsoleMessage.MessageLevel.ERROR ||
         message.messageLevel == ConsoleMessage.MessageLevel.WARNING) {
 
@@ -159,7 +161,10 @@ object WebView {
   def checkUrl(url: String) {
     if (!url.startsWith("javascript:")) {
       stackTraceHandler(Nil) {
-        if (URI(url).getHost.isEmpty) $w("Android 4.4 does not like zero length hostnames: " + url)
+        URI(url).host.flatMap(x =>
+          if (!x.isEmpty) Some("Android 4.4 does not like zero length hostnames: " + url)
+          else None
+        ).foreach($w(_))
       }
     }
   }
