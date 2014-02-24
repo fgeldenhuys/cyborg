@@ -3,6 +3,8 @@ package cyborg
 import cyborg.Context._
 import android.content.{Intent => AIntent}
 import android.os.Parcelable
+import scala.collection.JavaConversions._
+import cyborg.util.control._
 
 object Intent {
   trait ExtraProp[T] {
@@ -37,16 +39,31 @@ object Intent {
       activity.startActivityForResult(self, requestCode)
     }
 
+    def broadcast()(implicit context: Context) {
+      context.sendBroadcast(self)
+    }
+
+    def ->:[A](pair: (String, A))(implicit prop: ExtraProp[A]): AIntent = {
+      prop.set(self, pair._1, pair._2)
+      self
+    }
+
     class Extra {
-      def apply[T](key: String)(implicit prop: ExtraProp[T]): Option[T] = {
+      def apply[T](key: String)(implicit prop: ExtraProp[T]): Option[T] =
         prop.get(self, key)
-      }
       def update[T](key: String, value: T)(implicit prop: ExtraProp[T]) =
         prop.set(self, key, value)
     }
     val extra = new Extra
 
-    def putExtras(extras: (String, Any)*) {
+    /*def parcelListExtra[T <: Parcelable](key: String): List[T] = {
+      (for {
+        extras <- self.extras
+        arrayList <- tryOption[java.util.ArrayList[T]](extras.getParcelableArrayList[T](key))
+      } yield arrayList.toList) getOrElse List.empty
+    }*/
+
+    @deprecated def putExtras(extras: (String, Any)*) {
       for ((name, value) <- extras) {
         value match {
           case string: String => self.putExtra(name, string)
@@ -62,7 +79,6 @@ object Intent {
     }
 
     def extras = Option(self.getExtras)
-    def stringExtra(name: String) = Option(self.getStringExtra(name))
   }
 
   object Intent {
@@ -71,5 +87,6 @@ object Intent {
 
     def apply() = new AIntent()
     def apply[A](implicit context: Context, m: Manifest[A]) = new AIntent(context, /* m.runtimeClass*/ m.erasure)
+    def apply(action: String) = new AIntent(action)
   }
 }

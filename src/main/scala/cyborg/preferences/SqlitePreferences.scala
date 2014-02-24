@@ -18,9 +18,7 @@ object SqlitePreferences {
       assert(context != null)
       assert(context.c != null)
       assert(androidPrefsSection != null)
-      tryOption {
-        Option(context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess))
-      }.flatten
+      tryOption(context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess))
     }
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
