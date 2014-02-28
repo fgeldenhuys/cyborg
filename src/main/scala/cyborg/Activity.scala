@@ -63,15 +63,17 @@ object Activity {
     t
   }
 
-  def alert(title: String, message: String)(implicit context: Context): Future[Boolean] = {
+  def alert(title: String, message: String)(implicit activity: android.app.Activity): Future[Boolean] = {
     val p = promise[Boolean]
     try {
-      val dialog = new AlertDialog.Builder(context)
+      val dialog = new AlertDialog.Builder(activity)
       dialog.setTitle(title).setMessage(message)
       dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
         def onClick(dialog: DialogInterface, button: Int) { p success true }
       })
-      dialog.show()
+      activity.runOnUiThread(new Runnable {
+        override def run() { dialog.show() }
+      })
     }
     catch {
       case e: Exception =>
@@ -81,12 +83,12 @@ object Activity {
     p.future
   }
 
-  def prompt(title: String, message: String)(implicit context: Context): Future[Option[String]] = {
+  def prompt(title: String, message: String)(implicit activity: android.app.Activity): Future[Option[String]] = {
     val p = promise[Option[String]]
     try {
-      val dialog = new AlertDialog.Builder(context)
+      val dialog = new AlertDialog.Builder(activity)
       dialog.setTitle(title).setMessage(message)
-      val input = new EditText(context)
+      val input = new EditText(activity)
       dialog.setView(input)
       dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
         def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
@@ -94,7 +96,9 @@ object Activity {
       dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
         def onClick(dialog: DialogInterface, button: Int) { p success None }
       })
-      dialog.show()
+      activity.runOnUiThread(new Runnable {
+        override def run() { dialog.show() }
+      })
     }
     catch {
       case e: Exception =>

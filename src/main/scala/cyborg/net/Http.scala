@@ -31,7 +31,7 @@ trait Http {
 
   def get(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
-         : Future[HttpResult] = future {
+         : Future[HttpResult] = future { blocking {
     val getParams = makeGetParams(data)
     val fullUrl = url + (if (getParams.isEmpty) "" else "?" + getParams)
     $d(s"GET '$fullUrl'", 1)
@@ -53,23 +53,24 @@ trait Http {
             SimpleHttpResult(-1, e.getMessage)
           case e: FileNotFoundException =>
             val responseCode = http.getResponseCode
-            $w(s"$responseCode $e for '$fullUrl'")
-            SimpleHttpResult(responseCode, "Resource not found")
-          case e: IOException =>
             val errorContent = read(http.getErrorStream)
+            $w(s"$responseCode $e for '$fullUrl'")
+            SimpleHttpResult(responseCode, errorContent)
+          case e: IOException =>
             val responseCode = http.getResponseCode
+            val errorContent = read(http.getErrorStream)
             $w(s"$responseCode $e for '$fullUrl'")
             SimpleHttpResult(responseCode, errorContent)
         }
     }
-  }
+  }}
 
   def post(url: String, data: Map[String, String] = Map.empty)
           (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
           : Future[HttpResult] =
   {
     val p = promise[HttpResult]()
-    future {
+    future { blocking {
       $d(s"POST '$url' $data", 1)
       createConnection(url)(params.copy(chunked = false)) match {
         case Left(t) => throw t
@@ -119,7 +120,7 @@ trait Http {
               }
           }
       }
-    }
+    }}
     p.future
   }
 
@@ -156,7 +157,7 @@ trait Http {
 
   def getFile(url: String, outputFile: String, data: Map[String, String] = Map.empty)
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
-         : Future[HttpResult] = future {
+         : Future[HttpResult] = future { blocking {
     import cyborg.util.io._
     val fullUrl = url + "?" + makeGetParams(data)
     $d(s"GET FILE '$fullUrl'", 1)
@@ -192,14 +193,14 @@ trait Http {
             SimpleHttpResult(responseCode, errorContent)
         }
     }
-  }
+  }}
 
   def getFileM(url: String, outputFile: String, data: Map[String, String] = Map.empty)
               (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
               : Monitor[HttpResult, Bytes] = {
     import cyborg.util.io._
     val m = monitor[HttpResult, Bytes]
-    future {
+    future { blocking {
       val fullUrl = url + "?" + makeGetParams(data)
       $d(s"GET FILE '$fullUrl'", 1)
       createConnection(fullUrl) match {
@@ -238,13 +239,13 @@ trait Http {
               m success SimpleHttpResult(responseCode, "")
           }
       }
-    }
+    }}
     m
   }
 
   def getBytes(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
-  : Future[Array[Byte]] = future {
+  : Future[Array[Byte]] = future { blocking {
     val getParams = makeGetParams(data)
     val fullUrl = url + (if (getParams.isEmpty) "" else "?" + getParams)
     $d(s"GET BYTES '$fullUrl'", 1)
@@ -260,7 +261,7 @@ trait Http {
         http.disconnect()
         bytes.toByteArray
     }
-  }
+  }}
 
   def withHost(host: String) = new HttpHostWrapper(this, host)
 }

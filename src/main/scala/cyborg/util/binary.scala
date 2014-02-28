@@ -72,15 +72,26 @@ object binary {
     def toShort: Short = ByteBuffer.wrap(data).getShort
   }
 
+  implicit class StringCyborgBinaryExt(val string: String) extends AnyVal {
+    def decodeBase64: Array[Byte] = Base64.decode(string, Base64.DEFAULT)
+  }
+
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))
   implicit class ByteBufferCyborgExt(val data: ByteBuffer) extends AnyVal {
     def hexString = data.array().map("%02X" format _).mkString(" ")
+    def pad(byte: Byte): ByteBuffer = data.put(Array.fill[Byte](data.remaining())(byte))
+
     def << (byte: Byte): ByteBuffer = data.put(byte)
     def << (int: Int): ByteBuffer = data.putInt(int)
     def << (short: Short): ByteBuffer = data.putShort(short)
     def << (bytes: Array[Byte]): ByteBuffer = data.put(bytes)
     def << (string: String): ByteBuffer = data.put(string.getBytes("UTF-8"))
-    def pad(byte: Byte): ByteBuffer = data.put(Array.fill[Byte](data.remaining())(byte))
+
+    def getByteArray(n: Int): Array[Byte] = {
+      val dst = Array.ofDim[Byte](n)
+      data.get(dst, 0, n)
+      dst
+    }
   }
 
   case class InvalidHexString(message: String) extends Exception(message)

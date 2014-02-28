@@ -10,7 +10,7 @@ import scala.collection.JavaConversions._
   case class PrefNotFoundException(message: String) extends Exception(message)
 
   @Deprecated case class Preferences(section: String) {
-    $w("Using stupid broken android preferences here!\n" + cyborg.util.debug.getStackTrace)
+    //$w("Using stupid broken android preferences here!\n" + cyborg.util.debug.getStackTrace)
 
     private def prefs(implicit context: Context) =
       context.getSharedPreferences(section, Context.ModeMultiProcess)

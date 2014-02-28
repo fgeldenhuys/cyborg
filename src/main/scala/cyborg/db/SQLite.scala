@@ -217,22 +217,32 @@ object SQLite {
   }
 
   trait CursorGetter[T] {
-    def get(cursor: AC, column: Int): Option[T]
+    def get(cursor: AC, column: Int): T
   }
   implicit val stringCursorGetter = new CursorGetter[String] {
-    def get(cursor: AC, column: Int): Option[String] = Option(cursor.getString(column))
+    def get(cursor: AC, column: Int) = cursor.getString(column)
   }
   implicit val blobCursorGetter = new CursorGetter[Array[Byte]] {
-    def get(cursor: AC, column: Int): Option[Array[Byte]] = Option(cursor.getBlob(column))
+    def get(cursor: AC, column: Int) = cursor.getBlob(column)
   }
   implicit val intCursorGetter = new CursorGetter[Int] {
-    def get(cursor: AC, column: Int): Option[Int] = Option(cursor.getInt(column))
+    def get(cursor: AC, column: Int) = cursor.getInt(column)
   }
   implicit val longCursorGetter = new CursorGetter[Long] {
-    def get(cursor: AC, column: Int): Option[Long] = Option(cursor.getLong(column))
+    def get(cursor: AC, column: Int) = cursor.getLong(column)
   }
   implicit val booleanCursorGetter = new CursorGetter[Boolean] {
-    def get(cursor: AC, column: Int): Option[Boolean] = Option(cursor.getInt(column) == 1)
+    def get(cursor: AC, column: Int) = cursor.getInt(column) == 1
+  }
+
+  class CursorColumnIterator[A](val cursor: AC, column: Int)
+                               (implicit val getter: CursorGetter[A]) extends Iterator[A] {
+    if (cursor.isBeforeFirst) cursor.moveToFirst()
+    override def hasNext: Boolean = !cursor.isLast
+    override def next(): A = {
+      cursor.moveToNext()
+      getter.get(cursor, column)
+    }
   }
 
   implicit class CursorExt(val cursor: AC) /* extends AnyVal */ { // @tailrec is broken with AnyVal
@@ -246,7 +256,7 @@ object SQLite {
       tryOption {
         if (cursor.getCount > 0) {
           if (cursor.isBeforeFirst) cursor.moveToNext()
-          getter.get(cursor, cursor.getColumnIndex(columnName))
+          Some(getter.get(cursor, cursor.getColumnIndex(columnName)))
         }
         else None
       } .flatten
@@ -259,6 +269,9 @@ object SQLite {
     }
 
     def isEmpty: Boolean = cursor.getCount == 0
+
+    def toColumnIterator[A](columnName: String)(implicit getter: CursorGetter[A]): CursorColumnIterator[A] =
+      new CursorColumnIterator[A](cursor, cursor.getColumnIndex(columnName))
 
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)
@@ -331,7 +344,7 @@ object SQLite {
       else cursor.moveToNext()
 
       if (cursor.isAfterLast) acc
-      else toTypedListHelper[T](field, getter.get(cursor, cursor.getColumnIndex(field)).map(_ +: acc) getOrElse acc)
+      else toTypedListHelper[T](field, getter.get(cursor, cursor.getColumnIndex(field)) +: acc)
     }
 
     // Use when SELECT COUNT(*) type query was used

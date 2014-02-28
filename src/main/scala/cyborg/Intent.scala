@@ -3,8 +3,6 @@ package cyborg
 import cyborg.Context._
 import android.content.{Intent => AIntent}
 import android.os.Parcelable
-import scala.collection.JavaConversions._
-import cyborg.util.control._
 
 object Intent {
   trait ExtraProp[T] {
@@ -55,13 +53,6 @@ object Intent {
         prop.set(self, key, value)
     }
     val extra = new Extra
-
-    /*def parcelListExtra[T <: Parcelable](key: String): List[T] = {
-      (for {
-        extras <- self.extras
-        arrayList <- tryOption[java.util.ArrayList[T]](extras.getParcelableArrayList[T](key))
-      } yield arrayList.toList) getOrElse List.empty
-    }*/
 
     @deprecated def putExtras(extras: (String, Any)*) {
       for ((name, value) <- extras) {

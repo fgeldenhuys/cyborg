@@ -3,16 +3,21 @@ package cyborg.preferences
 import android.content.SharedPreferences
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.Context, cyborg.Context._
+import cyborg.crypto.CryptoKey
 import cyborg.db.SQLite._
 import cyborg.util.control._
 import cyborg.Log._
 import scalaz._, Scalaz._
+import android.database.Cursor
 
 object SqlitePreferences {
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
   case class NotASetException(section: String, key: String) extends Exception(s"Key '$key' is not a set in section '$section'")
 
-  class Preferences(val section: String, val androidPrefsSection: String)(implicit val context: Context) {
+  class Preferences(val section: String,
+                    val cryptoKey: CryptoKey,
+                    val androidPrefsSection: String)
+                   (implicit val context: Context) {
     val helper = new DbOpenHelper
     val androidPrefs: Option[SharedPreferences] = {
       assert(context != null)
@@ -44,6 +49,14 @@ object SqlitePreferences {
       retryOnException[Any](3) {
         helper.writableDatabase.map { db =>
           db.delete("prime", "section = ? AND key = ?", section, key)
+        }
+      }
+    }
+
+    def globDelete(glob: String) {
+      retryOnException[Any](3) {
+        helper.writableDatabase.map { db =>
+          db.delete("prime", "section = ? AND key GLOB ?", section, glob)
         }
       }
     }
@@ -94,13 +107,38 @@ object SqlitePreferences {
         }
       }
 
+      def contains[T](value: T)(implicit prop: PrefProp[T]): Boolean = {
+        helper.readableDatabase.map(db => prop.setContains(db, section, key, value)) getOrElse false
+      }
+
       def toList[T](implicit prop: PrefProp[T]): List[T] = {
         helper.readableDatabase.map(db => prop.setGet(db, section, key)).getOrElse(List.empty)
       }
       def toSet[T](implicit prop: PrefProp[T]): Set[T] = toList[T](prop).toSet
     }
-
     def set(key: String) = new PrefSet(key)
+
+    class PrefSecure {
+      import cyborg.util.binary._
+      import cyborg.crypto.SimpleEncryption._
+
+      def apply[T](key: String)(implicit encryption: SimpleEncryption[T]): Option[T] = {
+        retryOnException[Option[T]](3) {
+          for {
+            db <- helper.readableDatabase.toOption
+            str <- stringPrefProp.get(db, section, key)
+          } yield decrypt[T](str.decodeBase64, cryptoKey)
+        } .toOption.flatten
+      }
+
+      def update[T](key: String, value: T)(implicit encryption: SimpleEncryption[T]) {
+        retryOnException[Any](3) {
+          val data = encrypt[T](value, cryptoKey).base64
+          helper.writableDatabase.map(db => stringPrefProp.put(db, section, key, data))
+        }
+      }
+    }
+    def secure = new PrefSecure
 
     class DbOpenHelper extends SQLiteOpenHelper(context, "CyborgPreferencesDb", null, 1) {
       def onCreate(db: SQLiteDatabase) {
@@ -196,11 +234,11 @@ object SqlitePreferences {
         val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
         if (check.isEmpty) { // Nothing there
           //throw KeyNotDefinedException(section, key)
-          $w("Key not defined! " + cyborg.util.debug.getStackTrace)
+          $w(s"Trying to remove a value from an undefined set: '$key'")
         }
         else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
           //throw NotASetException(section, key)
-          $w("Not a set! " + cyborg.util.debug.getStackTrace)
+          $w(s"Trying to remove a value from something other than a set: '$key'\n" + cyborg.util.debug.getStackTrace)
         }
         else {
           check.get[Long]("value") map { setId =>
@@ -211,25 +249,37 @@ object SqlitePreferences {
       }
     }
 
-    def setGet(db: SQLiteDatabase, section: String, key: String): List[T] = {
+    def setQuery[A](db: SQLiteDatabase, section: String, key: String, errval: A)(f: Cursor => A): A = {
       db.transaction { db =>
         val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
         val result = if (check.isEmpty) // Nothing there
-          List.empty
+          errval
         else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
           //throw NotASetException(section, key)
           $w("Not a set! " + cyborg.util.debug.getStackTrace)
-          List.empty
+          errval
         }
         else {
           check.get[Long]("value") .map { setId =>
-            db.raw("SELECT value FROM sets WHERE section = ? AND setId = ?", section, setId.toString)
-              .toTypedList[T]("value")(getter)
-          } .getOrElse (List.empty)
+            val cursor = db.raw("SELECT value FROM sets WHERE section = ? AND setId = ?", section, setId.toString)
+            f(cursor)
+          } .getOrElse (errval)
         }
         check.close()
         result
-      } .getOrElse (List.empty)
+      } .getOrElse (errval)
+    }
+
+    def setGet(db: SQLiteDatabase, section: String, key: String): List[T] = {
+      setQuery[List[T]](db, section, key, List.empty[T]) { cursor =>
+        cursor.toTypedList[T]("value")(getter)
+      }
+    }
+
+    def setContains(db: SQLiteDatabase, section: String, key: String, value: T): Boolean = {
+      setQuery[Boolean](db, section, key, false) { cursor =>
+        cursor.toColumnIterator("value")(getter) exists (_ == value)
+      }
     }
 
     def getter: CursorGetter[T]
@@ -267,21 +317,28 @@ object SqlitePreferences {
       if (prefs.contains(key)) Some(prefs.getBoolean(key, false)) else None
   }
 
-  class JavaPreferences(androidContext: android.content.Context, section: String, androidPrefsSection: String) {
+  class JavaPreferences(androidContext: android.content.Context,
+                        section: String,
+                        cryptoKey: CryptoKey,
+                        androidPrefsSection: String) {
     assert(androidContext != null)
     assert(section != null)
 
     implicit val context: Context = androidContext
-    val p = new Preferences(section, androidPrefsSection)
+    val p = new Preferences(section, cryptoKey, androidPrefsSection)
 
     def getString(key: String, default: String): String = p[String](key) getOrElse default
     def getInt(key: String, default: Int): Int = p[Int](key) getOrElse default
     def getLong(key: String, default: Long): Long = p[Long](key) getOrElse default
     def getBoolean(key: String, default: Boolean): Boolean = p[Boolean](key) getOrElse default
 
+    def getSecureString(key: String, default: String): String = p.secure[String](key) getOrElse default
+
     def setString(key: String, value: String) { p(key) = value }
     def setInt(key: String, value: Int) { p(key) = value }
     def setLong(key: String, value: Long) { p(key) = value }
     def setBoolean(key: String, value: Boolean) { p(key) = value }
+
+    def setSecureString(key: String, value: String) { p.secure(key) = value }
   }
 }
