@@ -59,7 +59,13 @@ object SQLite {
       result
     }
 
-    def raw(sql: String, args: String*) = db.rawQuery(sql, args.toArray)
+    def raw[A](sql: String, args: String*)(f: AC => A) = {
+      val cursor = db.rawQuery(sql, args.toArray)
+      val result = f(cursor)
+      cursor.close()
+      result
+    }
+
     def exec(sql: String, args: String*) = db.execSQL(sql, args.toArray)
 
     def transaction[T](f: (ASQLD) => T): Option[T] = {
@@ -262,11 +268,11 @@ object SQLite {
       } .flatten
     }
 
-    def getAndClose[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
+    /*def getAndClose[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
       val result: Option[T] = get[T](columnName)
       cursor.close()
       result
-    }
+    }*/
 
     def isEmpty: Boolean = cursor.getCount == 0
 

@@ -87,22 +87,22 @@ object SqlitePreferences {
       def delete() {
         helper.writableDatabase.map {
           _.transaction { db =>
-            val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-            if (check.isEmpty) { // Nothing there
-              //throw KeyNotDefinedException(section, key)
-              $w("Key not defined! " + cyborg.util.debug.getStackTrace)
-            }
-            else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
-              //throw NotASetException(section, key)
-              $w("Not a set! " + cyborg.util.debug.getStackTrace)
-            }
-            else {
-              check.get[Long]("value") map { setId =>
-                db.delete("sets", "section = ? AND setId = ?", section, setId)
-                db.delete("prime", "section = ? AND key = ?", section, key)
+            db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
+              if (check.isEmpty) { // Nothing there
+                //throw KeyNotDefinedException(section, key)
+                $w("Key not defined! " + cyborg.util.debug.getStackTrace)
+              }
+              else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+                //throw NotASetException(section, key)
+                $w("Not a set! " + cyborg.util.debug.getStackTrace)
+              }
+              else {
+                check.get[Long]("value") map { setId =>
+                  db.delete("sets", "section = ? AND setId = ?", section, setId)
+                  db.delete("prime", "section = ? AND key = ?", section, key)
+                }
               }
             }
-            check.close()
           }
         }
       }
@@ -182,7 +182,7 @@ object SqlitePreferences {
 
   trait PrefProp[T] {
     def get(db: SQLiteDatabase, section: String, key: String): Option[T] = {
-      db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key).get("value")(getter)
+      db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key)(_.get("value")(getter))
     }
 
     def put(db: SQLiteDatabase, section: String, key: String, value: T) {
@@ -196,77 +196,77 @@ object SqlitePreferences {
       db.transaction { db =>
         db.exec("INSERT OR IGNORE INTO prime (section, key, value) VALUES (?, ?, 1)", section, key)
         db.exec("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
-        db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key).getAndClose("value")(getter)
+        db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key)(_.get("value")(getter))
       } .flatten
     }
 
     private def getSetId(db: SQLiteDatabase): Option[Long] = {
       db.exec("UPDATE meta SET value = value + 1 WHERE property = ?", "set_id")
-      db.raw("SELECT value FROM meta WHERE property = ?", "set_id").getAndClose[Long]("value")
+      db.raw("SELECT value FROM meta WHERE property = ?", "set_id")(_.get[Long]("value"))
     }
 
     def setAdd(db: SQLiteDatabase, section: String, key: String, value: T) {
       db.transaction { db =>
-        val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-        if (check.isEmpty) { // New set, no previous value
-          getSetId(db) map { setId =>
-            db.insert("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
-            db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
+        db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
+          if (check.isEmpty) { // New set, no previous value
+            getSetId(db) map { setId =>
+              db.insert("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
+              db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
+            }
+          }
+          else if (check.get[Int]("setValue").exists(_ == 1)) { // Already a set
+            check.get[Int]("value") map { prime =>
+              db.insert("sets", "section" -> section, "setId" -> prime, "value" -> value)(stringContentValuesPutter, intContentValuesPutter, putter)
+            }
+          }
+          else { // Assuming there is a previous non-set value assigned to this key
+            getSetId(db) map { setId =>
+              db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
+              db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
+            }
           }
         }
-        else if (check.get[Int]("setValue").exists(_ == 1)) { // Already a set
-          check.get[Int]("value") map { prime =>
-            db.insert("sets", "section" -> section, "setId" -> prime, "value" -> value)(stringContentValuesPutter, intContentValuesPutter, putter)
-          }
-        }
-        else { // Assuming there is a previous non-set value assigned to this key
-          getSetId(db) map { setId =>
-            db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
-            db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
-          }
-        }
-        check.close()
       }
     }
 
     def setRemove(db: SQLiteDatabase, section: String, key: String, value: T) {
       db.transaction { db =>
-        val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-        if (check.isEmpty) { // Nothing there
-          //throw KeyNotDefinedException(section, key)
-          $w(s"Trying to remove a value from an undefined set: '$key'")
-        }
-        else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
-          //throw NotASetException(section, key)
-          $w(s"Trying to remove a value from something other than a set: '$key'\n" + cyborg.util.debug.getStackTrace)
-        }
-        else {
-          check.get[Long]("value") map { setId =>
-            db.delete("sets", "section = ? AND setId = ? AND value = ?", section, setId, value.toString)
+        db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
+          if (check.isEmpty) { // Nothing there
+            //throw KeyNotDefinedException(section, key)
+            $w(s"Trying to remove a value from an undefined set: '$key'")
+          }
+          else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+            //throw NotASetException(section, key)
+            $w(s"Trying to remove a value from something other than a set: '$key'\n" + cyborg.util.debug.getStackTrace)
+          }
+          else {
+            check.get[Long]("value") map { setId =>
+              db.delete("sets", "section = ? AND setId = ? AND value = ?", section, setId, value.toString)
+            }
           }
         }
-        check.close()
       }
     }
 
     def setQuery[A](db: SQLiteDatabase, section: String, key: String, errval: A)(f: Cursor => A): A = {
       db.transaction { db =>
-        val check = db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key)
-        val result = if (check.isEmpty) // Nothing there
-          errval
-        else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
-          //throw NotASetException(section, key)
-          $w("Not a set! " + cyborg.util.debug.getStackTrace)
-          errval
+        db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
+          if (check.isEmpty) // Nothing there
+            errval
+          else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+            //throw NotASetException(section, key)
+            $w("Not a set! " + cyborg.util.debug.getStackTrace)
+            errval
+          }
+          else {
+            check.get[Long]("value") .map { setId =>
+              db.raw("SELECT value FROM sets WHERE section = ? AND setId = ?", section, setId.toString) { cursor =>
+                f(cursor)
+              }
+            } .getOrElse (errval)
+          }
         }
-        else {
-          check.get[Long]("value") .map { setId =>
-            val cursor = db.raw("SELECT value FROM sets WHERE section = ? AND setId = ?", section, setId.toString)
-            f(cursor)
-          } .getOrElse (errval)
-        }
-        check.close()
-        result
       } .getOrElse (errval)
     }
 
