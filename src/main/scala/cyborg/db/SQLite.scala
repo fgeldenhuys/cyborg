@@ -252,12 +252,6 @@ object SQLite {
   }
 
   implicit class CursorExt(val cursor: AC) /* extends AnyVal */ { // @tailrec is broken with AnyVal
-    def apply[T](f: (AC) => T): T = {
-      val result = f(cursor)
-      cursor.close()
-      result
-    }
-
     def get[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
       tryOption {
         if (cursor.getCount > 0) {
@@ -267,12 +261,6 @@ object SQLite {
         else None
       } .flatten
     }
-
-    /*def getAndClose[T](columnName: String)(implicit getter: CursorGetter[T]): Option[T] = {
-      val result: Option[T] = get[T](columnName)
-      cursor.close()
-      result
-    }*/
 
     def isEmpty: Boolean = cursor.getCount == 0
 
