@@ -7,8 +7,14 @@ import scala.concurrent.{Future, Promise}
 import scala.util.control.Exception._
 import scala.util.{Failure, Success}
 import scalaz._, Scalaz._
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
+import scala.concurrent.duration.Duration
 
 object control {
+  case class NotImplemented(message: String = "Not implemented") extends Exception(message)
+  case class BreakException() extends Exception
+  case class TimeoutException(message: String) extends Exception(message)
+
   implicit class OptionExt[A](val x: Option[A]) extends AnyVal {
     def failWith(f: => Any): Option[A] = {
       if (x.isDefined) x
@@ -55,8 +61,71 @@ object control {
       result
   }
 
-  case class NotImplemented(message: String = "Not implemented") extends Exception(message)
-  case class BreakException() extends Exception
+  implicit class ReentrantReadWriteLockCyborgExt(val lock: ReentrantReadWriteLock) extends AnyVal {
+    def r = lock.readLock()
+    def w = lock.writeLock()
+  }
+
+  implicit class LockCyborgExt(val lock: Lock) extends AnyVal {
+    def retry[A](times: Int)(f: => A): Throwable \/ A = retryHelper[A](times, () => f)
+    /* @tailrec */ private def retryHelper[A](times: Int, f: () => A): Throwable \/ A = {
+      lock.lock()
+      val result = try {
+        \/-(f())
+      }
+      catch {
+        case e: Throwable =>
+          if (times <= 0) e.printStackTrace()
+          -\/(e)
+      }
+      finally {
+        lock.unlock()
+      }
+      if (result.isLeft && times > 0)
+        retryHelper[A](times - 1, f)
+      else
+        result
+    }
+
+    def retryFor[A](d: Duration)(f: => A): Throwable \/ A = retryForHelper[A](d, () => f)
+    /* @tailrec */ private def retryForHelper[A](d: Duration, f: () => A): Throwable \/ A = {
+      import cyborg.util.execution.systemTime
+      import cyborg.Log._
+      import java.util.concurrent.TimeUnit
+
+      val waitTime = d.toMillis
+      val startTime = systemTime
+      try {
+        var result: Option[Throwable \/ A] = None
+        do {
+          val timeLeft = Math.max((startTime + waitTime) - systemTime, 1)
+          if (lock.tryLock(timeLeft, TimeUnit.MILLISECONDS)) {
+            try {
+              result = Some(\/-(f()))
+            }
+            catch {
+              case e: Throwable =>
+                if (systemTime >= startTime + waitTime)
+                  result = Some(-\/(e))
+                else
+                  $d(s"Getting lock failed with '${e.toString}', retrying...")
+            }
+            finally {
+              lock.unlock()
+            }
+          }
+        } while (result.isEmpty && systemTime < startTime + waitTime)
+        result getOrElse {
+          val e = TimeoutException("Timeout waiting for lock")
+          e.printStackTrace()
+          -\/(e)
+        }
+      }
+      catch {
+        case e: InterruptedException => -\/(e)
+      }
+    }
+  }
 
   def monitor[A,P]: Monitor[A,P] = new Monitor[A,P]()
 

@@ -1,24 +1,38 @@
 package cyborg.preferences
 
 import android.content.SharedPreferences
+import android.database.Cursor
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.Context, cyborg.Context._
 import cyborg.crypto.CryptoKey
 import cyborg.db.SQLite._
-import cyborg.util.control._
+import cyborg.db.SQLiteContentProvider
 import cyborg.Log._
+import cyborg.util.control._
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import scala.concurrent.duration._
 import scalaz._, Scalaz._
-import android.database.Cursor
 
 object SqlitePreferences {
+  import ContentValuesHelper._
+
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
   case class NotASetException(section: String, key: String) extends Exception(s"Key '$key' is not a set in section '$section'")
+
+  /*class SqlitePreferencesProvider(authority: String)
+    extends SQLiteContentProvider(authority, List("prime", "meta", "stats")) {
+    override def makeHelper(context: android.content.Context) = DbOpenHelper()(context)
+  }*/
+
+  private val lock = new ReentrantReadWriteLock()
+  private val retryDuration = 100 milliseconds
 
   class Preferences(val section: String,
                     val cryptoKey: CryptoKey,
                     val androidPrefsSection: String)
                    (implicit val context: Context) {
-    val helper = new DbOpenHelper
+    private def helper = DbOpenHelper()
+
     val androidPrefs: Option[SharedPreferences] = {
       assert(context != null)
       assert(context.c != null)
@@ -27,35 +41,35 @@ object SqlitePreferences {
     }
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      retryOnException[Option[T]](3) {
-        helper.readableDatabase.toOption.flatMap(db => prop.get(db, section, key))
+      lock.r.retryFor[Option[T]](retryDuration) {
+        helper.read[Option[T]](db => prop.get(db, section, key)).flatten
           .orElse(androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key)))
       } .toOption.flatten
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
-      retryOnException[Any](3) {
-        helper.writableDatabase.map(db => prop.put(db, section, key, value))
+      lock.w.retryFor(retryDuration) {
+        helper.write(db => prop.put(db, section, key, value))
       }
     }
 
     def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
-      retryOnException[Boolean](3) {
-        helper.readableDatabase.map(db => prop.?(db, section, key)).getOrElse(false)
+      lock.r.retryFor[Boolean](retryDuration) {
+        helper.read(db => prop.?(db, section, key)).getOrElse(false)
       } .getOrElse(false)
     }
 
     def delete(key: String) {
-      retryOnException[Any](3) {
-        helper.writableDatabase.map { db =>
+      lock.w.retryFor[Any](retryDuration) {
+        helper.write { db =>
           db.delete("prime", "section = ? AND key = ?", section, key)
         }
       }
     }
 
     def globDelete(glob: String) {
-      retryOnException[Any](3) {
-        helper.writableDatabase.map { db =>
+      lock.w.retryFor[Any](retryDuration) {
+        helper.write { db =>
           db.delete("prime", "section = ? AND key GLOB ?", section, glob)
         }
       }
@@ -70,27 +84,31 @@ object SqlitePreferences {
     }
 
     def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      tryOption {
-        helper.writableDatabase.toOption.flatMap(db => prop.increment(db, section, key))
-      } .flatMap(identity)
+      lock.w.retryFor[Option[T]](retryDuration) {
+        helper.write(db => prop.increment(db, section, key)).flatten
+      } .toOption.flatten
     }
 
     class PrefSet(val key: String) {
       def += [T](value: T)(implicit prop: PrefProp[T]) {
-        helper.writableDatabase.map(db => prop.setAdd(db, section, key, value))
+        lock.w.retryFor(retryDuration) {
+          helper.write(db => prop.setAdd(db, section, key, value))
+        }
       }
 
       def -= [T](value: T)(implicit prop: PrefProp[T]) {
-        helper.writableDatabase.map(db => prop.setRemove(db, section, key, value))
+        lock.w.retryFor(retryDuration) {
+          helper.write(db => prop.setRemove(db, section, key, value))
+        }
       }
 
       def delete() {
-        helper.writableDatabase.map {
-          _.transaction { db =>
+        lock.w.retryFor(retryDuration) {
+          helper.writeTransaction { db =>
             db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
               if (check.isEmpty) { // Nothing there
                 //throw KeyNotDefinedException(section, key)
-                $w("Key not defined! " + cyborg.util.debug.getStackTrace)
+                $w(s"Key '$key' not defined in section '$section'!")
               }
               else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
                 //throw NotASetException(section, key)
@@ -108,11 +126,15 @@ object SqlitePreferences {
       }
 
       def contains[T](value: T)(implicit prop: PrefProp[T]): Boolean = {
-        helper.readableDatabase.map(db => prop.setContains(db, section, key, value)) getOrElse false
+        lock.r.retryFor(retryDuration) {
+          helper.read(db => prop.setContains(db, section, key, value)) getOrElse false
+        } getOrElse false
       }
 
       def toList[T](implicit prop: PrefProp[T]): List[T] = {
-        helper.readableDatabase.map(db => prop.setGet(db, section, key)).getOrElse(List.empty)
+        lock.r.retryFor(retryDuration) {
+          helper.read(db => prop.setGet(db, section, key)).getOrElse(List.empty)
+        } getOrElse List.empty
       }
       def toSet[T](implicit prop: PrefProp[T]): Set[T] = toList[T](prop).toSet
     }
@@ -123,60 +145,70 @@ object SqlitePreferences {
       import cyborg.crypto.SimpleEncryption._
 
       def apply[T](key: String)(implicit encryption: SimpleEncryption[T]): Option[T] = {
-        retryOnException[Option[T]](3) {
-          for {
-            db <- helper.readableDatabase.toOption
-            str <- stringPrefProp.get(db, section, key)
-          } yield decrypt[T](str.decodeBase64, cryptoKey)
+        lock.r.retryFor[Option[T]](retryDuration) {
+          (helper read { db =>
+            for (str <- stringPrefProp.get(db, section, key)) yield decrypt[T](str.decodeBase64, cryptoKey)
+          }).flatten
         } .toOption.flatten
       }
 
       def update[T](key: String, value: T)(implicit encryption: SimpleEncryption[T]) {
-        retryOnException[Any](3) {
+        lock.w.retryFor[Any](retryDuration) {
           val data = encrypt[T](value, cryptoKey).base64
-          helper.writableDatabase.map(db => stringPrefProp.put(db, section, key, data))
+          helper.write(db => stringPrefProp.put(db, section, key, data))
         }
       }
     }
     def secure = new PrefSecure
+  }
 
-    class DbOpenHelper extends SQLiteOpenHelper(context, "CyborgPreferencesDb", null, 1) {
-      def onCreate(db: SQLiteDatabase) {
-        db.exec(
-          """
-            | CREATE TABLE IF NOT EXISTS prime (
-            |   id INTEGER PRIMARY KEY NOT NULL,
-            |   section TEXT NOT NULL,
-            |   key TEXT NOT NULL,
-            |   value BLOB NOT NULL,
-            |   setValue INTEGER DEFAULT 0,
-            |   UNIQUE(section, key) ON CONFLICT REPLACE
-            | );
-          """.stripMargin)
-        db.exec(
-          """
-            | CREATE TABLE IF NOT EXISTS meta (
-            |   property TEXT PRIMARY KEY,
-            |   value BLOB NOT NULL
-            | );
-          """.stripMargin)
-        db.exec(
-          """
-            | CREATE TABLE IF NOT EXISTS sets (
-            |   id INTEGER PRIMARY KEY NOT NULL,
-            |   section TEXT NOT NULL,
-            |   setId INTEGER NOT NULL,
-            |   value BLOB NOT NULL
-            | );
-          """.stripMargin)
-        db.insert("meta", "property" -> "set_id", "value" -> 1)
-      }
+  class DbOpenHelper private (implicit context: Context) extends SQLiteOpenHelper(context, "CyborgPreferencesDb", null, 1) {
+    def onCreate(db: SQLiteDatabase) {
+      db.exec(
+        """
+          | CREATE TABLE IF NOT EXISTS prime (
+          |   id INTEGER PRIMARY KEY NOT NULL,
+          |   section TEXT NOT NULL,
+          |   key TEXT NOT NULL,
+          |   value BLOB NOT NULL,
+          |   setValue INTEGER DEFAULT 0,
+          |   UNIQUE(section, key) ON CONFLICT REPLACE
+          | );
+        """.stripMargin)
+      db.exec(
+        """
+          | CREATE TABLE IF NOT EXISTS meta (
+          |   property TEXT PRIMARY KEY,
+          |   value BLOB NOT NULL
+          | );
+        """.stripMargin)
+      db.exec(
+        """
+          | CREATE TABLE IF NOT EXISTS sets (
+          |   id INTEGER PRIMARY KEY NOT NULL,
+          |   section TEXT NOT NULL,
+          |   setId INTEGER NOT NULL,
+          |   value BLOB NOT NULL
+          | );
+        """.stripMargin)
+      db.insert("meta", "property" -> "set_id", "value" -> 1)
+    }
 
-      def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
-        db.exec("DROP TABLE IF EXISTS prime;")
-        db.exec("DROP TABLE IF EXISTS sets;")
-        onCreate(db)
+    def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
+      db.exec("DROP TABLE IF EXISTS prime;")
+      db.exec("DROP TABLE IF EXISTS sets;")
+      onCreate(db)
+    }
+  }
+
+  object DbOpenHelper {
+    private var instance: Option[DbOpenHelper] = None
+    def apply()(implicit context: Context): DbOpenHelper = {
+      if (instance.isEmpty) {
+        $d("*** CREATING PREFERENCES DB OPEN HELPER INSTANCE ***")
+        instance = Option(new DbOpenHelper)
       }
+      instance.get
     }
   }
 
