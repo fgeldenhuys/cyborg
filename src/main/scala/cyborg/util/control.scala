@@ -107,8 +107,10 @@ object control {
               case e: Throwable =>
                 if (systemTime >= startTime + waitTime)
                   result = Some(-\/(e))
-                else
-                  $d(s"Getting lock failed with '${e.toString}', retrying...")
+                else {
+                  $d(s"Getting lock failed with '${e.toString}'")
+                  e.printStackTrace()
+                }
             }
             finally {
               lock.unlock()

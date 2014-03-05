@@ -6,11 +6,8 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import cyborg.Context, cyborg.Context._
 import cyborg.crypto.CryptoKey
 import cyborg.db.SQLite._
-import cyborg.db.SQLiteContentProvider
 import cyborg.Log._
 import cyborg.util.control._
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import scala.concurrent.duration._
 import scalaz._, Scalaz._
 
 object SqlitePreferences {
@@ -23,9 +20,6 @@ object SqlitePreferences {
     extends SQLiteContentProvider(authority, List("prime", "meta", "stats")) {
     override def makeHelper(context: android.content.Context) = DbOpenHelper()(context)
   }*/
-
-  private val lock = new ReentrantReadWriteLock()
-  private val retryDuration = 100 milliseconds
 
   class Preferences(val section: String,
                     val cryptoKey: CryptoKey,
@@ -41,38 +35,24 @@ object SqlitePreferences {
     }
 
     def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      lock.r.retryFor[Option[T]](retryDuration) {
-        helper.read[Option[T]](db => prop.get(db, section, key)).flatten
-          .orElse(androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key)))
-      } .toOption.flatten
+      helper.read[Option[T]](db => prop.get(db, section, key)).toOption.flatten
+        .orElse(androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key)))
     }
 
     def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
-      lock.w.retryFor(retryDuration) {
-        helper.write(db => prop.put(db, section, key, value))
-      }
+      helper.write(db => prop.put(db, section, key, value))
     }
 
     def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
-      lock.r.retryFor[Boolean](retryDuration) {
-        helper.read(db => prop.?(db, section, key)).getOrElse(false)
-      } .getOrElse(false)
+      helper.read(db => prop.?(db, section, key)).getOrElse(false)
     }
 
     def delete(key: String) {
-      lock.w.retryFor[Any](retryDuration) {
-        helper.write { db =>
-          db.delete("prime", "section = ? AND key = ?", section, key)
-        }
-      }
+      helper.write(_.delete("prime", "section = ? AND key = ?", section, key))
     }
 
     def globDelete(glob: String) {
-      lock.w.retryFor[Any](retryDuration) {
-        helper.write { db =>
-          db.delete("prime", "section = ? AND key GLOB ?", section, glob)
-        }
-      }
+      helper.write(_.delete("prime", "section = ? AND key GLOB ?", section, glob))
     }
 
     def setOrDelete[T](key: String, value: Option[T])(implicit prop: PrefProp[T]) {
@@ -84,41 +64,33 @@ object SqlitePreferences {
     }
 
     def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
-      lock.w.retryFor[Option[T]](retryDuration) {
-        helper.write(db => prop.increment(db, section, key)).flatten
-      } .toOption.flatten
+      helper.write(db => prop.increment(db, section, key)).toOption.flatten
     }
 
     class PrefSet(val key: String) {
       def += [T](value: T)(implicit prop: PrefProp[T]) {
-        lock.w.retryFor(retryDuration) {
-          helper.write(db => prop.setAdd(db, section, key, value))
-        }
+        helper.write(db => prop.setAdd(db, section, key, value))
       }
 
       def -= [T](value: T)(implicit prop: PrefProp[T]) {
-        lock.w.retryFor(retryDuration) {
-          helper.write(db => prop.setRemove(db, section, key, value))
-        }
+        helper.write(db => prop.setRemove(db, section, key, value))
       }
 
       def delete() {
-        lock.w.retryFor(retryDuration) {
-          helper.writeTransaction { db =>
-            db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
-              if (check.isEmpty) { // Nothing there
-                //throw KeyNotDefinedException(section, key)
-                $w(s"Key '$key' not defined in section '$section'!")
-              }
-              else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
-                //throw NotASetException(section, key)
-                $w("Not a set! " + cyborg.util.debug.getStackTrace)
-              }
-              else {
-                check.get[Long]("value") map { setId =>
-                  db.delete("sets", "section = ? AND setId = ?", section, setId)
-                  db.delete("prime", "section = ? AND key = ?", section, key)
-                }
+        helper.writeTransaction { db =>
+          db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
+            if (check.isEmpty) { // Nothing there
+              //throw KeyNotDefinedException(section, key)
+              $w(s"Key '$key' not defined in section '$section'!")
+            }
+            else if (check.get[Int]("setValue").exists(_ == 0)) { // Value defined, but not a set
+              //throw NotASetException(section, key)
+              $w("Not a set! " + cyborg.util.debug.getStackTrace)
+            }
+            else {
+              check.get[Long]("value") map { setId =>
+                db.delete("sets", "section = ? AND setId = ?", section, setId)
+                db.delete("prime", "section = ? AND key = ?", section, key)
               }
             }
           }
@@ -126,15 +98,11 @@ object SqlitePreferences {
       }
 
       def contains[T](value: T)(implicit prop: PrefProp[T]): Boolean = {
-        lock.r.retryFor(retryDuration) {
-          helper.read(db => prop.setContains(db, section, key, value)) getOrElse false
-        } getOrElse false
+        helper.read(db => prop.setContains(db, section, key, value)) getOrElse false
       }
 
       def toList[T](implicit prop: PrefProp[T]): List[T] = {
-        lock.r.retryFor(retryDuration) {
-          helper.read(db => prop.setGet(db, section, key)).getOrElse(List.empty)
-        } getOrElse List.empty
+        helper.read(db => prop.setGet(db, section, key)).getOrElse(List.empty)
       }
       def toSet[T](implicit prop: PrefProp[T]): Set[T] = toList[T](prop).toSet
     }
@@ -145,24 +113,20 @@ object SqlitePreferences {
       import cyborg.crypto.SimpleEncryption._
 
       def apply[T](key: String)(implicit encryption: SimpleEncryption[T]): Option[T] = {
-        lock.r.retryFor[Option[T]](retryDuration) {
-          (helper read { db =>
-            for (str <- stringPrefProp.get(db, section, key)) yield decrypt[T](str.decodeBase64, cryptoKey)
-          }).flatten
-        } .toOption.flatten
+        (helper read { db =>
+          for (str <- stringPrefProp.get(db, section, key)) yield decrypt[T](str.decodeBase64, cryptoKey)
+        }).toOption.flatten
       }
 
       def update[T](key: String, value: T)(implicit encryption: SimpleEncryption[T]) {
-        lock.w.retryFor[Any](retryDuration) {
-          val data = encrypt[T](value, cryptoKey).base64
-          helper.write(db => stringPrefProp.put(db, section, key, data))
-        }
+        val data = encrypt[T](value, cryptoKey).base64
+        helper.write(db => stringPrefProp.put(db, section, key, data))
       }
     }
     def secure = new PrefSecure
   }
 
-  class DbOpenHelper private (implicit context: Context) extends SQLiteOpenHelper(context, "CyborgPreferencesDb", null, 1) {
+  class DbOpenHelper private (implicit context: Context) extends OpenHelper("CyborgPreferencesDb", 1) {
     def onCreate(db: SQLiteDatabase) {
       db.exec(
         """
@@ -203,6 +167,7 @@ object SqlitePreferences {
 
   object DbOpenHelper {
     private var instance: Option[DbOpenHelper] = None
+
     def apply()(implicit context: Context): DbOpenHelper = {
       if (instance.isEmpty) {
         $d("*** CREATING PREFERENCES DB OPEN HELPER INSTANCE ***")
@@ -229,7 +194,7 @@ object SqlitePreferences {
         db.exec("INSERT OR IGNORE INTO prime (section, key, value) VALUES (?, ?, 1)", section, key)
         db.exec("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
         db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key)(_.get("value")(getter))
-      } .flatten
+      } .toOption.flatten
     }
 
     private def getSetId(db: SQLiteDatabase): Option[Long] = {

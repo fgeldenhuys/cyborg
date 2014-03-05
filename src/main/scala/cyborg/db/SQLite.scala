@@ -1,13 +1,16 @@
 package cyborg.db
 
-import android.database.sqlite.{SQLiteDatabase => ASQLD, SQLiteDatabaseLockedException, SQLiteOpenHelper}
+import android.database.sqlite.{SQLiteDatabase => ASQLD, SQLiteOpenHelper}
 import android.database.{Cursor => AC}
 import android.content.ContentValues
+import cyborg.Context.Context
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 import cyborg.util.control._
 import cyborg.util.execution._
 import cyborg.Log._
 import scalaz._, Scalaz._
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 object SQLite {
   type StringOrBlob = Either[String, Array[Byte]]
@@ -106,18 +109,22 @@ object SQLite {
 
     def exec(sql: String, args: String*) = db.execSQL(sql, args.toArray)
 
-    def transaction[T](f: (ASQLD) => T): Option[T] = {
+    def transaction[T](f: (ASQLD) => T): Throwable \/ T = {
       val before = systemTime
       try {
         db.beginTransaction()
         try {
           val result = f(db)
           db.setTransactionSuccessful()
-          Some(result)
+          \/-(result)
         }
         catch {
           case ft: FailTransaction =>
-            None
+            -\/(ft)
+          case e: Throwable =>
+            $e("ERROR during transaction: " + e.toString)
+            e.printStackTrace()
+            -\/(e)
         }
       }
       finally {
@@ -186,67 +193,43 @@ object SQLite {
 
   }
 
-  implicit class OpenHelper(val oh: SQLiteOpenHelper) extends AnyVal {
+  abstract class OpenHelper(name: String, version: Int, val retryTime: Duration = 1.second)(implicit context: Context)
+    extends SQLiteOpenHelper(context, name, null, version) {
+
     import cyborg.Log._
 
-    def readableDatabase: Throwable \/ ASQLD = readableDatabaseHelper(systemTime + DefaultCutoff)
+    val lock = new ReentrantReadWriteLock()
 
-    /*@tailrec*/ private def readableDatabaseHelper(cutoff: Long): Throwable \/ ASQLD = {
-      try {
-        \/-(oh.getReadableDatabase)
-      }
-      catch {
-        /*case e: SQLiteDatabaseLockedException =>
-          $w("Waiting for locked database: " + e.getMessage)
-          try { Thread.sleep(10) } catch { case e: InterruptedException => }
-          if (systemTime >= cutoff) -\/(e)
-          else readableDatabaseHelper(cutoff)*/
-        case e: Throwable =>
-          e.printStackTrace()
-          -\/(e)
-      }
-    }
-
-    def read[A](f: ASQLD => A): Option[A] = {
-      readableDatabase.toOption map { db =>
+    def read[A](f: ASQLD => A): Throwable \/ A = {
+      lock.r.retryFor(retryTime) {
+        val db = getReadableDatabase
+        assert(db.isOpen)
+        if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
+        else if(db.isDbLockedByOtherThreads) $w("DB is locked by other threads!")
         val result = f(db)
         db.close()
         result
       }
     }
 
-    def writableDatabase: Throwable \/ ASQLD = writableDatabaseHelper(systemTime + DefaultCutoff)
-
-    /*@tailrec*/ private def writableDatabaseHelper(cutoff: Long): Throwable \/ ASQLD = {
-      try {
-        \/-(oh.getWritableDatabase)
-      }
-      catch {
-        /*case e: SQLiteDatabaseLockedException =>
-          $w("Waiting for locked database: " + e.getMessage)
-          try { Thread.sleep(10) } catch { case e: InterruptedException => }
-          if (systemTime >= cutoff) -\/(e)
-          else writableDatabaseHelper(cutoff)*/
-        case e: Throwable =>
-          e.printStackTrace()
-          -\/(e)
-      }
-    }
-
-    def write[A](f: ASQLD => A): Option[A] = {
-      writableDatabase.toOption map { db =>
+    def write[A](f: ASQLD => A): Throwable \/ A = {
+      lock.w.retryFor(retryTime) {
+        val db = getWritableDatabase
+        assert(db.isOpen)
+        if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
+        else if(db.isDbLockedByOtherThreads) $w("DB is locked by other threads!")
         val result = f(db)
         db.close()
         result
       }
     }
 
-    def writeTransaction[A](f: ASQLD => A): Option[A] = {
-      writableDatabase.toOption flatMap { db =>
-        val result = db.transaction[A](f)
-        db.close()
-        result
-      }
+    def writeTransaction[A](f: ASQLD => A): Throwable \/ A = {
+      write[Throwable \/ A] { db =>
+        db.transaction[A] { tdb =>
+          f(tdb)
+        }
+      } .flatMap(identity)
     }
   }
 
@@ -298,28 +281,28 @@ object SQLite {
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)
       val result = toListHelper()
-      cursor.close()
+      //cursor.close()
       result
     }
 
     def toList(field: String): List[String] = {
       cursor.moveToPosition(-1)
       val result = toListHelperWithField(field)
-      cursor.close()
+      //cursor.close()
       result
     }
 
     def toBlobList: List[Map[String, StringOrBlob]] = {
       cursor.moveToPosition(-1)
       val result = toBlobListHelper()
-      cursor.close()
+      //cursor.close()
       result
     }
 
     def toTypedList[T](field: String)(implicit getter: CursorGetter[T]): List[T] = {
       cursor.moveToPosition(-1)
       val result = toTypedListHelper[T](field)
-      cursor.close()
+      //cursor.close()
       result
     }
 

@@ -12,7 +12,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   import cyborg.db.KeyValue.KeyValueException
 
   def close() { stackTraceHandler(Unit) { sqlite.close() } }
-  def transaction[T](f: (KeyValue) => T): Option[T] = sqlite.transaction { db => f(this) }
+  def transaction[T](f: (KeyValue) => T): Option[T] = sqlite.transaction { db => f(this) } .toOption
 
   private val applyQuery = s"SELECT value FROM '$bucket' WHERE key = ?"
   private val allQuery = s"SELECT key, value FROM '$bucket'"
