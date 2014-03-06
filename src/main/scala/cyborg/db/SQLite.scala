@@ -102,6 +102,7 @@ object SQLite {
 
     def raw[A](sql: String, args: String*)(f: AC => A) = {
       val cursor = db.rawQuery(sql, args.toArray)
+      assert(db.isOpen)
       val result = f(cursor)
       cursor.close()
       result
@@ -252,13 +253,25 @@ object SQLite {
     def get(cursor: AC, column: Int) = cursor.getInt(column) == 1
   }
 
-  class CursorColumnIterator[A](val cursor: AC, column: Int)
-                               (implicit val getter: CursorGetter[A]) extends Iterator[A] {
+  class CursorColumnIterator[T](val cursor: AC, c1: Int)
+                               (implicit val getter: CursorGetter[T])
+                               extends Iterator[T] {
     if (cursor.isBeforeFirst) cursor.moveToFirst()
     override def hasNext: Boolean = !cursor.isLast
-    override def next(): A = {
+    override def next(): T = {
       cursor.moveToNext()
-      getter.get(cursor, column)
+      getter.get(cursor, c1)
+    }
+  }
+
+  class Cursor2ColumnIterator[T1, T2](val cursor: AC, c1: Int, c2: Int)
+                                     (implicit val getter1: CursorGetter[T1], val getter2: CursorGetter[T2])
+                                     extends Iterator[(T1, T2)] {
+    if (cursor.isBeforeFirst) cursor.moveToFirst()
+    override def hasNext: Boolean = !cursor.isLast
+    override def next(): (T1, T2) = {
+      cursor.moveToNext()
+      (getter1.get(cursor, c1), getter2.get(cursor, c2))
     }
   }
 
@@ -275,8 +288,13 @@ object SQLite {
 
     def isEmpty: Boolean = cursor.getCount == 0
 
-    def toColumnIterator[A](columnName: String)(implicit getter: CursorGetter[A]): CursorColumnIterator[A] =
-      new CursorColumnIterator[A](cursor, cursor.getColumnIndex(columnName))
+    def toColumnIterator[A](c1: String)(implicit getter: CursorGetter[A]): CursorColumnIterator[A] =
+      new CursorColumnIterator[A](cursor, cursor.getColumnIndex(c1))
+
+    def toColumnIterator[A1, A2](c1: String, c2: String)
+                                (implicit getter1: CursorGetter[A1], getter2: CursorGetter[A2]):
+                                Cursor2ColumnIterator[A1, A2] =
+      new Cursor2ColumnIterator[A1, A2](cursor, cursor.getColumnIndex(c1), cursor.getColumnIndex(c2))
 
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)

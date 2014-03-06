@@ -2,7 +2,7 @@ package cyborg.preferences
 
 import android.content.SharedPreferences
 import android.database.Cursor
-import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
+import android.database.sqlite.SQLiteDatabase
 import cyborg.Context, cyborg.Context._
 import cyborg.crypto.CryptoKey
 import cyborg.db.SQLite._
@@ -15,11 +15,6 @@ object SqlitePreferences {
 
   case class KeyNotDefinedException(section: String, key: String) extends Exception(s"Key not set '$key' for section '$section'")
   case class NotASetException(section: String, key: String) extends Exception(s"Key '$key' is not a set in section '$section'")
-
-  /*class SqlitePreferencesProvider(authority: String)
-    extends SQLiteContentProvider(authority, List("prime", "meta", "stats")) {
-    override def makeHelper(context: android.content.Context) = DbOpenHelper()(context)
-  }*/
 
   class Preferences(val section: String,
                     val cryptoKey: CryptoKey,
@@ -65,6 +60,10 @@ object SqlitePreferences {
 
     def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
       helper.write(db => prop.increment(db, section, key)).toOption.flatten
+    }
+
+    def all[T](implicit prop: PrefProp[T]): List[(String, T)] = {
+      helper.read(db => prop.all(db, section)).toOption.getOrElse(List.empty)
     }
 
     class PrefSet(val key: String) {
@@ -195,6 +194,10 @@ object SqlitePreferences {
         db.exec("UPDATE prime SET value = value + 1 WHERE section = ? AND key = ?", section, key)
         db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key)(_.get("value")(getter))
       } .toOption.flatten
+    }
+
+    def all(db: SQLiteDatabase, section: String): List[(String, T)] = {
+      db.raw("SELECT key, value FROM prime WHERE section = ?", section)(_.toColumnIterator[String, T]("key", "value")(stringCursorGetter, getter).toList)
     }
 
     private def getSetId(db: SQLiteDatabase): Option[Long] = {
