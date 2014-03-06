@@ -14,6 +14,7 @@ object control {
   case class NotImplemented(message: String = "Not implemented") extends Exception(message)
   case class BreakException() extends Exception
   case class TimeoutException(message: String) extends Exception(message)
+  case class LockedException() extends Exception
 
   implicit class OptionExt[A](val x: Option[A]) extends AnyVal {
     def failWith(f: => Any): Option[A] = {
@@ -67,6 +68,18 @@ object control {
   }
 
   implicit class LockCyborgExt(val lock: Lock) extends AnyVal {
+    def tryOnce[A](f: => A): Option[A] = {
+      if (lock.tryLock()) {
+        try {
+          Some(f)
+        }
+        finally {
+          lock.unlock()
+        }
+      }
+      else None
+    }
+
     def retry[A](times: Int)(f: => A): Throwable \/ A = retryHelper[A](times, () => f)
     /* @tailrec */ private def retryHelper[A](times: Int, f: () => A): Throwable \/ A = {
       lock.lock()
