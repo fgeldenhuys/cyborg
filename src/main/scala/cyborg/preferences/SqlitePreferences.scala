@@ -46,6 +46,12 @@ object SqlitePreferences {
       helper.write(_.delete("prime", "section = ? AND key = ?", section, key))
     }
 
+    def delete(keys: List[String]) {
+      helper.writeTransaction { db =>
+        keys map { key => db.delete("prime", "section = ? AND key = ?", section, key) }
+      }
+    }
+
     def globDelete(glob: String) {
       helper.write(_.delete("prime", "section = ? AND key GLOB ?", section, glob))
     }

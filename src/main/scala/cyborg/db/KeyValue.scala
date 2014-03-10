@@ -1,6 +1,6 @@
 package cyborg.db
 
-import android.database.sqlite.{SQLiteDatabaseLockedException, SQLiteDatabase, SQLiteOpenHelper}
+import android.database.sqlite.SQLiteDatabase
 import cyborg.Context._
 import cyborg.db.SQLite._
 import cyborg.Log._
@@ -190,56 +190,33 @@ object KeyValue {
     $e(cyborg.util.debug.getStackTrace)
   }
 
-  //TODO: create bucket table if it doesn't exist, and remove version parameter
-  class DbOpenHelper(val bucket: String, version: Int = 1)(implicit context: Context)
-    extends SQLiteOpenHelper(context, "CyborgKeyValueDb", null, version) {
+  class DbOpenHelper()(implicit context: Context)
+    extends OpenHelper("CyborgKeyValueDb", 1) {
 
     override def onOpen(db: SQLiteDatabase) {
-      db.execSQL(
-        s"""
-          | CREATE TABLE IF NOT EXISTS '$bucket' (
-          |   key TEXT PRIMARY KEY NOT NULL,
-          |   stringindex TEXT DEFAULT NULL,
-          |   value BLOB NOT NULL
-          | );
-        """.stripMargin)
     }
 
     def onCreate(db: SQLiteDatabase) {
     }
 
     def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
-      db.execSQL(s"DROP TABLE IF EXISTS '$bucket';")
-      onCreate(db)
-    }
-
-    def readable: KeyValue = {
-      val cancel = System.currentTimeMillis() + MaxWaitForLockMillis
-      try {
-        new KeyValue(getReadableDatabase, bucket)
-      }
-      catch {
-        case e: SQLiteDatabaseLockedException =>
-          if (System.currentTimeMillis() > cancel) throw e
-          $i("Waiting for locked database: " + e.getMessage)
-          try { Thread.sleep(10) } catch { case e: InterruptedException => }
-          readable
-      }
-    }
-
-    def writable: KeyValue = {
-      val cancel = System.currentTimeMillis() + MaxWaitForLockMillis
-      try {
-        new KeyValue(getWritableDatabase, bucket)
-      }
-      catch {
-        case e: SQLiteDatabaseLockedException =>
-          if (System.currentTimeMillis() > cancel) throw e
-          $i("Waiting for locked database: " + e.getMessage)
-          try { Thread.sleep(10) } catch { case e: InterruptedException => }
-          writable
-      }
     }
   }
 
+  private var instance: Option[DbOpenHelper] = None
+
+  def helper(bucket: String)(implicit context: Context): DbOpenHelper = {
+    if (instance.isEmpty) {
+      $d("*** CREATING KEYVALUE DB OPEN HELPER INSTANCE ***")
+      instance = Option(new DbOpenHelper)
+    }
+    instance.map(_.write(_.execSQL(s"""
+          | CREATE TABLE IF NOT EXISTS '$bucket' (
+          |   key TEXT PRIMARY KEY NOT NULL,
+          |   stringindex TEXT DEFAULT NULL,
+          |   value BLOB NOT NULL
+          | );
+        """.stripMargin)))
+    instance.get
+  }
 }

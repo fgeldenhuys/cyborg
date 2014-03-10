@@ -102,7 +102,7 @@ object SQLite {
 
     def raw[A](sql: String, args: String*)(f: AC => A) = {
       val cursor = db.rawQuery(sql, args.toArray)
-      assert(db.isOpen)
+      assert(db.isOpen) // TODO: take out this assert
       val result = f(cursor)
       cursor.close()
       result
@@ -202,7 +202,7 @@ object SQLite {
     val lock = new ReentrantReadWriteLock()
 
     def read[A](f: ASQLD => A): Throwable \/ A = {
-      lock.r.retryFor(retryTime) {
+      lock.w.retryFor(retryTime) { // Changing this to read lock causes DB locks, seems like even reads need to be exclusive
         val db = getReadableDatabase
         assert(db.isOpen)
         if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
