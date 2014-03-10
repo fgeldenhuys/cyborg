@@ -194,7 +194,11 @@ object SQLite {
 
   }
 
-  abstract class OpenHelper(name: String, version: Int, val retryTime: Duration = 1.second)(implicit context: Context)
+  abstract class OpenHelper(name: String,
+                            version: Int,
+                            val retryTime: Duration = 1.second,
+                            val pauseTime: Duration = 25.millis)
+                           (implicit context: Context)
     extends SQLiteOpenHelper(context, name, null, version) {
 
     import cyborg.Log._
@@ -202,7 +206,7 @@ object SQLite {
     val lock = new ReentrantReadWriteLock()
 
     def read[A](f: ASQLD => A): Throwable \/ A = {
-      lock.w.retryFor(retryTime) { // Changing this to read lock causes DB locks, seems like even reads need to be exclusive
+      lock.w.retryFor(retryTime, pauseTime) { // Changing this to read lock causes DB locks, seems like even reads need to be exclusive
         val db = getReadableDatabase
         assert(db.isOpen)
         if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
@@ -214,7 +218,7 @@ object SQLite {
     }
 
     def write[A](f: ASQLD => A): Throwable \/ A = {
-      lock.w.retryFor(retryTime) {
+      lock.w.retryFor(retryTime, pauseTime) {
         val db = getWritableDatabase
         assert(db.isOpen)
         if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")

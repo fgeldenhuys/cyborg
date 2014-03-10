@@ -8,7 +8,7 @@ import scala.util.control.Exception._
 import scala.util.{Failure, Success}
 import scalaz._, Scalaz._
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 
 object control {
   case class NotImplemented(message: String = "Not implemented") extends Exception(message)
@@ -100,8 +100,9 @@ object control {
         result
     }
 
-    def retryFor[A](d: Duration)(f: => A): Throwable \/ A = retryForHelper[A](d, () => f)
-    /* @tailrec */ private def retryForHelper[A](d: Duration, f: () => A): Throwable \/ A = {
+    def retryFor[A](d: Duration, pause: Duration = 10.millis)(f: => A): Throwable \/ A =
+      retryForHelper[A](d, pause, () => f)
+    /* @tailrec */ private def retryForHelper[A](d: Duration, pause: Duration, f: () => A): Throwable \/ A = {
       import cyborg.util.execution.systemTime
       import cyborg.Log._
       import java.util.concurrent.TimeUnit
@@ -128,6 +129,9 @@ object control {
             finally {
               lock.unlock()
             }
+          }
+          if (result.isEmpty && pause.toMillis > 0) {
+            try { Thread.sleep(pause.toMillis) } catch { case e: InterruptedException => }
           }
         } while (result.isEmpty && systemTime < startTime + waitTime)
         result getOrElse {
