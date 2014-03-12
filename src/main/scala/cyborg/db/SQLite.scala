@@ -88,24 +88,10 @@ object SQLite {
   implicit class Database(val db: ASQLD) extends AnyVal {
     import ContentValuesHelper._
 
-    /*def apply[T](f: (ASQLD) => T): T = {
-      val before = systemTime
-      val result = f(db)
-      val dtime = systemTime - before
-      db.close()
-      if (dtime > TooLongOperation) {
-        $w(s"WARNING Database operation took $dtime milliseconds")
-        cyborg.util.debug.printStackTrace()
-      }
-      result
-    }*/
-
     def raw[A](sql: String, args: String*)(f: AC => A) = {
       val cursor = db.rawQuery(sql, args.toArray)
-      assert(db.isOpen) // TODO: take out this assert
-      val result = f(cursor)
-      cursor.close()
-      result
+      try { f(cursor) }
+      finally { cursor.close() }
     }
 
     def exec(sql: String, args: String*) = db.execSQL(sql, args.toArray)
@@ -208,24 +194,26 @@ object SQLite {
     def read[A](f: ASQLD => A): Throwable \/ A = {
       lock.w.retryFor(retryTime, pauseTime) { // Changing this to read lock causes DB locks, seems like even reads need to be exclusive
         val db = getReadableDatabase
-        assert(db.isOpen)
-        if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
-        else if(db.isDbLockedByOtherThreads) $w("DB is locked by other threads!")
-        val result = f(db)
-        db.close()
-        result
+        try {
+          assert(db.isOpen)
+          if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
+          else if(db.isDbLockedByOtherThreads) $w("DB is locked by other threads!")
+          f(db)
+        }
+        finally { db.close() }
       }
     }
 
     def write[A](f: ASQLD => A): Throwable \/ A = {
       lock.w.retryFor(retryTime, pauseTime) {
         val db = getWritableDatabase
-        assert(db.isOpen)
-        if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
-        else if(db.isDbLockedByOtherThreads) $w("DB is locked by other threads!")
-        val result = f(db)
-        db.close()
-        result
+        try {
+          assert(db.isOpen)
+          if (db.isDbLockedByCurrentThread) $w("DB is locked by current thread!")
+          else if(db.isDbLockedByOtherThreads) $w("DB is locked by other threads!")
+          f(db)
+        }
+        finally { db.close() }
       }
     }
 
@@ -303,28 +291,24 @@ object SQLite {
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)
       val result = toListHelper()
-      //cursor.close()
       result
     }
 
     def toList(field: String): List[String] = {
       cursor.moveToPosition(-1)
       val result = toListHelperWithField(field)
-      //cursor.close()
       result
     }
 
     def toBlobList: List[Map[String, StringOrBlob]] = {
       cursor.moveToPosition(-1)
       val result = toBlobListHelper()
-      //cursor.close()
       result
     }
 
     def toTypedList[T](field: String)(implicit getter: CursorGetter[T]): List[T] = {
       cursor.moveToPosition(-1)
       val result = toTypedListHelper[T](field)
-      //cursor.close()
       result
     }
 
