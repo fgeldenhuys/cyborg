@@ -14,6 +14,9 @@ object HttpPlain extends Http {
       val urlConnection = urlObject.openConnection
       val http = urlConnection.asInstanceOf[HttpURLConnection]
       http.setRequestProperty("Accept-Encoding", "identity")
+      // FUCKING KITKAT!!!!!!11   The next line actually stops keep-alive, which on KitKat (and who knows where
+      // else), leaks open file handles. This then causes all kinds of other things to fail randomly.
+      http.setRequestProperty("Connection", "Close")
       http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
       http.setReadTimeout(params.readTimeout.toMillis.toInt)
       if (params.chunked) http.setChunkedStreamingMode(0)

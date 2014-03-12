@@ -197,7 +197,7 @@ object SQLite {
   abstract class OpenHelper(name: String,
                             version: Int,
                             val retryTime: Duration = 1.second,
-                            val pauseTime: Duration = 25.millis)
+                            val pauseTime: Duration = 99.millis)
                            (implicit context: Context)
     extends SQLiteOpenHelper(context, name, null, version) {
 

@@ -119,11 +119,14 @@ object control {
             }
             catch {
               case e: Throwable =>
-                if (systemTime >= startTime + waitTime)
-                  result = Some(-\/(e))
-                else {
-                  $d(s"Getting lock failed with '${e.toString}'")
+                if (systemTime >= startTime + waitTime) {
+                  $d(s"TIMEOUT retrying: '${e.toString}")
                   e.printStackTrace()
+                  result = Some(-\/(e))
+                }
+                else {
+                  $d(s"RETRY because '${e.toString}'")
+                  //e.printStackTrace()
                 }
             }
             finally {

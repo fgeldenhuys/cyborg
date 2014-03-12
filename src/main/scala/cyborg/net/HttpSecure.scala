@@ -20,6 +20,7 @@ object HttpSecure extends Http {
     catching(classOf[Exception]) either {
       val http = new URL(url).openConnection.asInstanceOf[HttpsURLConnection]
       http.setRequestProperty("Accept-Encoding", "identity")
+      http.setRequestProperty("Connection", "Close")
       http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
       http.setReadTimeout(params.readTimeout.toMillis.toInt)
       if (params.chunked) http.setChunkedStreamingMode(0)
