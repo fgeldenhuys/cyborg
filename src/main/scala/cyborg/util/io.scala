@@ -30,6 +30,7 @@ object io {
 
   def openFile(path: String) = Option(new File(path))
   def openExistingFile(path: String) = openFile(path).filter(_.exists())
+  def fileExists(path: String) = openFile(path) exists (_.exists())
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
     val buf = new Array[Byte](BufferSize)
