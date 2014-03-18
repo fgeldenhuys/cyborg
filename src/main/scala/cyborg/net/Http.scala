@@ -32,8 +32,7 @@ trait Http {
   def get(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
          : Future[HttpResult] = future { blocking {
-    val getParams = makeGetParams(data)
-    val fullUrl = url + (if (getParams.isEmpty) "" else "?" + getParams)
+    val fullUrl = url + makeGetParams(data)
     $d(s"GET '$fullUrl'", 1)
     createConnection(fullUrl) match {
       case Left(t) => throw t
@@ -159,7 +158,7 @@ trait Http {
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
          : Future[HttpResult] = future { blocking {
     import cyborg.util.io._
-    val fullUrl = url + "?" + makeGetParams(data)
+    val fullUrl = url + makeGetParams(data)
     $d(s"GET FILE '$fullUrl'", 1)
     createConnection(fullUrl) match {
       case Left(t) => throw t
@@ -201,7 +200,7 @@ trait Http {
     import cyborg.util.io._
     val m = monitor[HttpResult, Bytes]
     future { blocking {
-      val fullUrl = url + "?" + makeGetParams(data)
+      val fullUrl = url + makeGetParams(data)
       $d(s"GET FILE '$fullUrl'", 1)
       createConnection(fullUrl) match {
         case Left(t) => m failure t
@@ -246,8 +245,7 @@ trait Http {
   def getBytes(url: String, data: Map[String, String] = Map.empty)(progress: Option[(Bytes) => Any])
          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
   : Future[Array[Byte]] = future { blocking {
-    val getParams = makeGetParams(data)
-    val fullUrl = url + (if (getParams.isEmpty) "" else "?" + getParams)
+    val fullUrl = url + makeGetParams(data)
     $d(s"GET BYTES '$fullUrl'", 1)
     createConnection(fullUrl) match {
       case Left(t) => throw t
@@ -339,9 +337,12 @@ object Http {
     result.toString("UTF-8")
   } getOrElse ("")
 
-  def makeGetParams(params: Map[String, String]): String =
-    URLEncodedUtils.format((params map { case (k: String,v: String) =>
-      new BasicNameValuePair(k, v) }).toList, "utf-8")
+  def makeGetParams(params: Map[String, String]): String = {
+    if (params.isEmpty) ""
+    else "?" +
+      URLEncodedUtils.format((params map { case (k: String,v: String) =>
+        new BasicNameValuePair(k, v) }).toList, "utf-8")
+  }
 
   def makeFormParams(params: Map[String, String]): UrlEncodedFormEntity = {
     new UrlEncodedFormEntity(
