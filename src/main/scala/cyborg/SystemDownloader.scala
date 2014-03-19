@@ -128,14 +128,18 @@ class SystemDownloader(
   def downloads: Seq[Download] = {
     stackTraceHandler(Seq.empty[Download]) {
       (for (cursor <- Option(downloadManager.query(new DM.Query))) yield {
-        val result = Seq.fill(cursor.getCount) {
-          val download = cursor2download(cursor)
-          cursor.moveToNext()
-          download map (_ updateFrom store)
+        try {
+          val result = Seq.fill(cursor.getCount) {
+            val download = cursor2download(cursor)
+            cursor.moveToNext()
+            download map (_ updateFrom store)
+          }
+          assert(cursor.isAfterLast)
+          result.flatten
         }
-        assert(cursor.isAfterLast)
-        cursor.close()
-        result.flatten
+        finally {
+          cursor.close()
+        }
       }) getOrElse Seq.empty
     }
   }
@@ -185,22 +189,26 @@ object SystemDownloader {
 
     def sync(implicit downloadManager: DM): Download = {
       for (cursor <- Option(downloadManager.query(new DM.Query))) {
-        while(!cursor.isAfterLast) {
-          for (check <- cursor2download(cursor)) {
-            if (this.id == check.id) {
-              cursor.close()
-              return copy(
-                status = check.status,
-                title = check.title,
-                description = check.description,
-                size = check.size,
-                downloaded = check.downloaded,
-                bookId = check.bookId)
+        try {
+          while (!cursor.isAfterLast) {
+            for (check <- cursor2download(cursor)) {
+              if (this.id == check.id) {
+                cursor.close()
+                return copy(
+                  status = check.status,
+                  title = check.title,
+                  description = check.description,
+                  size = check.size,
+                  downloaded = check.downloaded,
+                  bookId = check.bookId)
+              }
             }
+            cursor.moveToNext()
           }
-          cursor.moveToNext()
         }
-        cursor.close()
+        finally {
+          cursor.close()
+        }
       }
       this
     }
