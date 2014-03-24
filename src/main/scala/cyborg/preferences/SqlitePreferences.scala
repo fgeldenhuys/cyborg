@@ -22,7 +22,7 @@ object SqlitePreferences {
                    (implicit val context: Context) {
     private def helper = DbOpenHelper()
 
-    val androidPrefs: Option[SharedPreferences] = {
+    lazy val androidPrefs: Option[SharedPreferences] = {
       assert(context != null)
       assert(context.c != null)
       assert(androidPrefsSection != null)
