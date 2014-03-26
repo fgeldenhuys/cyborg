@@ -42,5 +42,5 @@ object resources {
 
   }
 
-  def resource[T](id: Int)(implicit context: Context, resourceGetter: ResourceGetter[T]): Resource[T] = resourceGetter(id)
+  def resource[T](id: Int)(implicit resourceGetter: ResourceGetter[T]): Resource[T] = resourceGetter(id)
 }

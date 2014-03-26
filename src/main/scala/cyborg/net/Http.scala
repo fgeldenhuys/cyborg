@@ -203,7 +203,9 @@ trait Http {
       val fullUrl = url + makeGetParams(data)
       $d(s"GET FILE '$fullUrl'", 1)
       createConnection(fullUrl) match {
-        case Left(t) => m failure t
+        case Left(t) =>
+          //$w("GET FILE createConnection failed: " + t)
+          m failure t
         case Right(http) =>
           try {
             val in = http.getInputStream

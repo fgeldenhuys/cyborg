@@ -93,4 +93,6 @@ object Context {
   }
   implicit def wrapped2broadcastReceiver(wrapped: CyborgWrappedBroadcastReceiver): BroadcastReceiver = wrapped.receiver
 
+  def register(xs: CyborgWrappedBroadcastReceiver*) { for (x <- xs) x.register() }
+  def unregister(xs: CyborgWrappedBroadcastReceiver*) { for (x <- xs) x.unregister() }
 }
