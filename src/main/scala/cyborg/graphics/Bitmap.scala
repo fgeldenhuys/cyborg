@@ -12,6 +12,7 @@ object Bitmap {
     }
     case class Jpeg(quality: Int = 80) extends Format { def format = B.CompressFormat.JPEG }
     case class Png(quality: Int = 100) extends Format { def format = B.CompressFormat.PNG }
+    //WARNING: WebP transparency support was only added in Android 4.2
     case class WebP(quality: Int = 100) extends Format { def format = B.CompressFormat.WEBP }
   }
 

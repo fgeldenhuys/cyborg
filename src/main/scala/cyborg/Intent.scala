@@ -1,14 +1,28 @@
 package cyborg
 
-import cyborg.Context._
 import android.content.{Intent => AIntent}
 import android.os.Parcelable
+import cyborg.Context._
+import cyborg.util.control._
+import scala.collection.JavaConversions._
 
 object Intent {
   trait ExtraProp[T] {
     def get(intent: AIntent, key: String): Option[T]
     def set(intent: AIntent, key: String, value: T)
   }
+
+  def makeParcelableListExtraProp[T <: Parcelable](implicit prop: ExtraProp[T]): ExtraProp[List[T]] = new ExtraProp[List[T]] {
+    override def get(intent: AIntent, key: String): Option[List[T]] =
+      for {
+        extras <- intent.extras
+        arrayList <- tryOption(extras.getParcelableArrayList[T](key))
+      } yield arrayList.toList
+    override def set(intent: AIntent, key: String, value: List[T]) {
+      intent.putExtra(key, new java.util.ArrayList[T](value))
+    }
+  }
+
   implicit val stringExtraProp = new ExtraProp[String] {
     def get(intent: AIntent, key: String): Option[String] =
       for (extras <- intent.extras; value <- Option(extras.getString(key))) yield value
