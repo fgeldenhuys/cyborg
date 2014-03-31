@@ -46,6 +46,8 @@ object execution {
       result
     }
 
+    def future(implicit sec: ScheduledExecutionContext): Future[T] = scala.concurrent.future(now)
+
     // Runs original function, and tries to kill it if it runs longer than d and returns.
     def within(d: Duration)(implicit sec: ScheduledExecutionContext): Future[T] = {
       val p = promise[T]
@@ -92,7 +94,13 @@ object execution {
   }
 
   def execute[T](f: => T) = new ExecuteWrapper[T](() => f)
-  implicit def implicitExecuteNow[T](ew: ExecuteWrapper[T]): T = ew.now
+
+  def serialExecution[A](list: List[ExecuteWrapper[Future[A]]])
+                        (implicit sec: ScheduledExecutionContext): Future[List[A]] = {
+    scala.concurrent.future {
+      for (task <- list) yield Await.result(task.now, Duration.Inf)
+    }
+  }
 
   class ConfirmExecution[T](d: Duration, val wrapped: ExecuteWrapper[T]) {
     var timeout = systemTime + d.toMillis

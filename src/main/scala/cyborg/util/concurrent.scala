@@ -1,5 +1,6 @@
 package cyborg.util
 
+import cyborg.util.execution.ExecuteWrapper
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.Try
