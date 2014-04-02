@@ -162,7 +162,7 @@ object WebView {
     if (!url.startsWith("javascript:")) {
       stackTraceHandler(Nil) {
         URI(url).host.flatMap(x =>
-          if (!x.isEmpty) Some("Android 4.4 does not like zero length hostnames: " + url)
+          if (x.isEmpty) Some("Android 4.4 does not like zero length hostnames: " + url)
           else None
         ).foreach($w(_))
       }
