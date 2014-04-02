@@ -23,6 +23,12 @@ object Bitmap {
       if (success) Some(out.toByteArray)
       else None
     }
+
+    def scaled(w: Int, h: Int): B = B.createScaledBitmap(b, w, h, false)
+    def scaleHeight(h: Int): B = {
+      val w = math.round((h.toFloat / b.getHeight.toFloat) * b.getWidth.toFloat)
+      scaled(w, h)
+    }
   }
 
   def makeBitmap(bytes: Array[Byte]): Option[B] = tryOption(BF.decodeByteArray(bytes, 0, bytes.length))
