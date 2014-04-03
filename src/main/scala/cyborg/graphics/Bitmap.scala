@@ -26,7 +26,7 @@ object Bitmap {
 
     def scaled(w: Int, h: Int): B = B.createScaledBitmap(b, w, h, false)
     def scaleHeight(h: Int): B = {
-      val w = math.round((h.toFloat / b.getHeight.toFloat) * b.getWidth.toFloat)
+      val w = ((h.toFloat / b.getHeight.toFloat) * b.getWidth.toFloat).round
       scaled(w, h)
     }
   }
