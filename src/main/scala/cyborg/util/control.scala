@@ -44,6 +44,13 @@ object control {
     }
   }
 
+  def boolOption[T](bool: Boolean)(f: => T): Option[T] = {
+    bool match {
+      case true => tryOption(f)
+      case false => None
+    }
+  }
+
   def retryOnException[T](times: Int)(f: => T): Throwable \/ T =
     retryOnExceptionHelper(times, () => f)
 
