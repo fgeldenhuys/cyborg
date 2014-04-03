@@ -24,10 +24,23 @@ object Bitmap {
       else None
     }
 
-    def scaled(w: Int, h: Int): B = B.createScaledBitmap(b, w, h, false)
+    def scaled(w: Int, h: Int): B =
+      B.createScaledBitmap(b, w, h, false)
     def scaleHeight(h: Int): B = {
       val w = ((h.toFloat / b.getHeight.toFloat) * b.getWidth.toFloat).round
       scaled(w, h)
+    }
+
+    def cropped(x: Int, y: Int, w: Int, h: Int): B = {
+      val px = math.max(x, 0)
+      val py = math.max(y, 0)
+      val pw = math.max(w, 0)
+      val ph = math.max(h, 0)
+      val bw = b.getWidth
+      val bh = b.getHeight
+      B.createBitmap(b, x, y,
+        if (px + pw > bw) bw - px else pw,
+        if (py + ph > bh) bh - py else ph)
     }
   }
 
