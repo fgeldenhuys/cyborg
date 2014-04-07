@@ -5,6 +5,7 @@ import android.os.Parcelable
 import cyborg.Context._
 import cyborg.util.control._
 import scala.collection.JavaConversions._
+import scalaz._, Scalaz._, scalaz.concurrent._
 
 object Intent {
   trait ExtraProp[T] {
@@ -46,6 +47,8 @@ object Intent {
 
   implicit class IntentExt(val self: AIntent) /* extends AnyVal */ { // Nested class not allowed
     def start(implicit activity: Activity) { activity.startActivity(self) }
+
+    //def startForResult: Future((Int, Intent) => )
 
     def startForResult(requestCode: Int)(implicit activity: Activity) {
       activity.startActivityForResult(self, requestCode)
