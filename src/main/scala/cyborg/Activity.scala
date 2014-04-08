@@ -83,12 +83,14 @@ object Activity {
     p.future
   }
 
-  def prompt(title: String, message: String)(implicit activity: android.app.Activity): Future[Option[String]] = {
+  def prompt(title: String, message: String, text: String = "")
+            (implicit activity: android.app.Activity): Future[Option[String]] = {
     val p = promise[Option[String]]
     try {
       val dialog = new AlertDialog.Builder(activity)
       dialog.setTitle(title).setMessage(message)
       val input = new EditText(activity)
+      input.setText(text)
       dialog.setView(input)
       dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
         def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
