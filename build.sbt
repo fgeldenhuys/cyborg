@@ -1,6 +1,8 @@
 // Name of your app
 name := "cyborg"
 
+organization := "cyborg"
+
 // Version of your app
 version := "0.1"
 
