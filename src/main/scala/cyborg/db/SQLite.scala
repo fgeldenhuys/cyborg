@@ -308,8 +308,14 @@ object SQLite {
 
     def toTypedList[T](field: String)(implicit getter: CursorGetter[T]): List[T] = {
       cursor.moveToPosition(-1)
-      val result = toTypedListHelper[T](field)
-      result
+      toTypedListHelper[T](field)
+    }
+
+    def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String)
+                                                   (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8])
+                                                   :List[(T1, T2, T3, T4, T5, T6, T7, T8)] = {
+      cursor.moveToPosition(-1)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1, f2, f3, f4, f5, f6, f7, f8)
     }
 
     private def cursor2map(cursor: AC): Map[String, String] =
@@ -353,9 +359,25 @@ object SQLite {
     @tailrec private def toTypedListHelper[T](field: String, acc: List[T] = List.empty[T])(implicit getter: CursorGetter[T]): List[T] = {
       if (cursor.isBeforeFirst) cursor.moveToFirst()
       else cursor.moveToNext()
-
       if (cursor.isAfterLast) acc
       else toTypedListHelper[T](field, getter.get(cursor, cursor.getColumnIndex(field)) +: acc)
+    }
+
+    @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8)] = List.empty)
+                                                                          (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8])
+                                                                          :List[(T1, T2, T3, T4, T5, T6, T7, T8)] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+      if (cursor.isAfterLast) acc
+      else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1, f2, f3, f4, f5, f6, f7, f8,
+        (get1.get(cursor, cursor.getColumnIndex(f1)),
+         get2.get(cursor, cursor.getColumnIndex(f2)),
+         get3.get(cursor, cursor.getColumnIndex(f3)),
+         get4.get(cursor, cursor.getColumnIndex(f4)),
+         get5.get(cursor, cursor.getColumnIndex(f5)),
+         get6.get(cursor, cursor.getColumnIndex(f6)),
+         get7.get(cursor, cursor.getColumnIndex(f7)),
+         get8.get(cursor, cursor.getColumnIndex(f8))) +: acc)
     }
 
     // Use when SELECT COUNT(*) type query was used
