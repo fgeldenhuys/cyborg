@@ -207,6 +207,21 @@ object io {
     }
   }
 
+  object ZipExtractors {
+    object ZipFileEntry {
+      def unapply(entry: java.util.zip.ZipEntry): Option[(String, Long, Long)] = entry.isDirectory match {
+        case false => Some(entry.getName, entry.getSize, entry.getTime)
+        case true => None
+      }
+    }
+    object ZipDirectoryEntry {
+      def unapply(entry: java.util.zip.ZipEntry): Option[(String, Long, Long)] = entry.isDirectory match {
+        case true => Some(entry.getName, entry.getSize, entry.getTime)
+        case false => None
+      }
+    }
+  }
+
   case class Usb(connection: UsbDeviceConnection, in: UsbEndpoint, out: UsbEndpoint) {
     def bulkRead(bytes: Int, timeout: Duration): Option[Array[Byte]] =
       connection.bulkRead(in, bytes, timeout)
