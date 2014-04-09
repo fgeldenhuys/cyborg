@@ -229,6 +229,7 @@ object SQLite {
   trait CursorGetter[T] {
     def get(cursor: AC, column: Int): T
   }
+
   implicit val stringCursorGetter = new CursorGetter[String] {
     def get(cursor: AC, column: Int) = cursor.getString(column)
   }
@@ -243,6 +244,22 @@ object SQLite {
   }
   implicit val booleanCursorGetter = new CursorGetter[Boolean] {
     def get(cursor: AC, column: Int) = cursor.getInt(column) == 1
+  }
+
+  implicit val stringOptionCursorGetter = new CursorGetter[Option[String]] {
+    def get(cursor: AC, column: Int) = tryOption(cursor.getString(column))
+  }
+  implicit val blobOptionCursorGetter = new CursorGetter[Option[Array[Byte]]] {
+    def get(cursor: AC, column: Int) = tryOption(cursor.getBlob(column))
+  }
+  implicit val intOptionCursorGetter = new CursorGetter[Option[Int]] {
+    def get(cursor: AC, column: Int) = tryOption(cursor.getInt(column))
+  }
+  implicit val longOptionCursorGetter = new CursorGetter[Option[Long]] {
+    def get(cursor: AC, column: Int) = tryOption(cursor.getLong(column))
+  }
+  implicit val booleanOptionCursorGetter = new CursorGetter[Option[Boolean]] {
+    def get(cursor: AC, column: Int) = tryOption(cursor.getInt(column) == 1)
   }
 
   class CursorColumnIterator[T](val cursor: AC, c1: Int)
