@@ -1,10 +1,6 @@
 package cyborg.net
 
 import cyborg.net.Http._
-import cyborg.net.Http.HttpParameters
-import cyborg.net.Http.HttpParameters
-import cyborg.net.Http.SimpleHttpResult
-import cyborg.net.Http.SimpleHttpResult
 import cyborg.util.binary._
 import cyborg.util.execution._
 import cyborg.util.execution.CancelledExecution
@@ -19,10 +15,6 @@ import org.apache.http.message.BasicNameValuePair
 import scala.collection.JavaConversions._
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.Some
-import scala.Some
-import scala.concurrent.promise
-import scala.concurrent.future
 
 trait Http {
   import cyborg.Log._
@@ -81,6 +73,126 @@ trait Http {
             http.setFixedLengthStreamingMode(formEntity.getContentLength.toInt)
             val out = new BufferedOutputStream(http.getOutputStream)
             formEntity.writeTo(out)
+            out.close()
+            //$d(s"[Http.post] Reading content.")
+            val content = read(http.getInputStream)
+            //$d(s"[Http.post] Content is ${content.length} bytes. Getting response code.")
+            val code = http.getResponseCode
+            //$d(s"[Http.post] Response code was $code.")
+            http.disconnect()
+            p success SimpleHttpResult(code, content)
+          }
+          catch {
+            case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+              $d(s"${e.getClass} caught for '$url': $e")
+              p success SimpleHttpResult(-1, e.getMessage)
+            case e: FileNotFoundException =>
+              $d(s"${e.getClass} caught")
+              execute {
+                val responseCode = http.getResponseCode
+                $w(s"$responseCode $e for '$url'")
+                p success SimpleHttpResult(responseCode, "Resource not found")
+              } within (5 seconds) recover {
+                case CancelledExecution(message) =>
+                  $w(s"Timeout getting error content for '$url'")
+                  p success SimpleHttpResult(-1, message)
+              }
+            case e: IOException =>
+              $d(s"${e.getClass} caught for '$url': $e")
+              execute {
+                val errorContent = read(http.getErrorStream)
+                val responseCode = http.getResponseCode
+                $w(s"$responseCode $e for '$url'")
+                p success SimpleHttpResult(responseCode, errorContent)
+              } within (5 seconds) recover {
+                case CancelledExecution(message) =>
+                  $w(s"Timeout getting error content for '$url'")
+                  p success SimpleHttpResult(-1, message)
+              }
+          }
+      }
+    }}
+    p.future
+  }
+
+  def postString(url: String, data: String, contentType: String)
+         (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+         : Future[HttpResult] =
+  {
+    val p = promise[HttpResult]()
+    future { blocking {
+      $d(s"POST '$url' $data'", 1)
+      createConnection(url)(params.copy(chunked = false)) match {
+        case Left(t) => throw t
+        case Right(http) =>
+          try {
+            val rawData = data.utf8
+            http.setRequestMethod("POST")
+            http.setRequestProperty("Content-Type", contentType)
+            http.setDoOutput(true)
+            http.setFixedLengthStreamingMode(rawData.size)
+            val out = new BufferedOutputStream(http.getOutputStream)
+            out.write(rawData)
+            out.close()
+            //$d(s"[Http.post] Reading content.")
+            val content = read(http.getInputStream)
+            //$d(s"[Http.post] Content is ${content.length} bytes. Getting response code.")
+            val code = http.getResponseCode
+            //$d(s"[Http.post] Response code was $code.")
+            http.disconnect()
+            p success SimpleHttpResult(code, content)
+          }
+          catch {
+            case e @ (_:ConnectException | _:UnknownHostException | _:SocketTimeoutException) =>
+              $d(s"${e.getClass} caught for '$url': $e")
+              p success SimpleHttpResult(-1, e.getMessage)
+            case e: FileNotFoundException =>
+              $d(s"${e.getClass} caught")
+              execute {
+                val responseCode = http.getResponseCode
+                $w(s"$responseCode $e for '$url'")
+                p success SimpleHttpResult(responseCode, "Resource not found")
+              } within (5 seconds) recover {
+                case CancelledExecution(message) =>
+                  $w(s"Timeout getting error content for '$url'")
+                  p success SimpleHttpResult(-1, message)
+              }
+            case e: IOException =>
+              $d(s"${e.getClass} caught for '$url': $e")
+              execute {
+                val errorContent = read(http.getErrorStream)
+                val responseCode = http.getResponseCode
+                $w(s"$responseCode $e for '$url'")
+                p success SimpleHttpResult(responseCode, errorContent)
+              } within (5 seconds) recover {
+                case CancelledExecution(message) =>
+                  $w(s"Timeout getting error content for '$url'")
+                  p success SimpleHttpResult(-1, message)
+              }
+          }
+      }
+    }}
+    p.future
+  }
+
+  def put(url: String, data: String, contentType: String)
+          (implicit params: HttpParameters = defaultHttpParameters, sec: ScheduledExecutionContext)
+          : Future[HttpResult] =
+  {
+    val p = promise[HttpResult]()
+    future { blocking {
+      $d(s"PUT '$url' $data'", 1)
+      createConnection(url)(params.copy(chunked = false)) match {
+        case Left(t) => throw t
+        case Right(http) =>
+          try {
+            val rawData = data.utf8
+            http.setRequestMethod("POST")
+            http.setRequestProperty("Content-Type", contentType)
+            http.setDoOutput(true)
+            http.setFixedLengthStreamingMode(rawData.size)
+            val out = new BufferedOutputStream(http.getOutputStream)
+            out.write(rawData)
             out.close()
             //$d(s"[Http.post] Reading content.")
             val content = read(http.getInputStream)
@@ -289,6 +401,12 @@ object Http {
     override def post(url: String, data: Map[String, String])
                      (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
       http.post(addHost(url), data)(params, sec)
+    override def postString(url: String, data: String, contentType: String)
+                     (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
+      http.postString(addHost(url), data, contentType)(params, sec)
+    override def put(url: String, data: String, contentType: String)
+                     (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
+      http.put(addHost(url), data, contentType)(params, sec)
     override def getFile(url: String, outputFile: String, data: Map[String, String])
                         (implicit params: HttpParameters, sec: ScheduledExecutionContext): Future[HttpResult] =
       http.getFile(addHost(url), outputFile, data)(params, sec)

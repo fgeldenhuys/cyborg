@@ -24,6 +24,7 @@ object SQLite {
     trait ContentValuesPutter[T] {
       def apply(cv: ContentValues, key: String, value: T)
     }
+
     implicit val intContentValuesPutter = new ContentValuesPutter[Int] {
       def apply(cv: ContentValues, key: String, value: Int) {
         cv.put(key, new java.lang.Integer(value))
@@ -47,6 +48,32 @@ object SQLite {
     implicit val byteArrayContentValuesPutter = new ContentValuesPutter[Array[Byte]] {
       def apply(cv: ContentValues, key: String, value: Array[Byte]) {
         cv.put(key, value)
+      }
+    }
+
+    implicit val intOptionContentValuesPutter = new ContentValuesPutter[Option[Int]] {
+      def apply(cv: ContentValues, key: String, value: Option[Int]) {
+        value map (x => cv.put(key, new java.lang.Integer(x))) getOrElse cv.putNull(key)
+      }
+    }
+    implicit val longOptionContentValuesPutter = new ContentValuesPutter[Option[Long]] {
+      def apply(cv: ContentValues, key: String, value: Option[Long]) {
+        value map (x => cv.put(key, new java.lang.Long(x))) getOrElse cv.putNull(key)
+      }
+    }
+    implicit val stringOptionContentValuesPutter = new ContentValuesPutter[Option[String]] {
+      def apply(cv: ContentValues, key: String, value: Option[String]) {
+        value map (x => cv.put(key, x)) getOrElse cv.putNull(key)
+      }
+    }
+    implicit val booleanOptionContentValuesPutter = new ContentValuesPutter[Option[Boolean]] {
+      def apply(cv: ContentValues, key: String, value: Option[Boolean]) {
+        value map (x => cv.put(key, x)) getOrElse cv.putNull(key)
+      }
+    }
+    implicit val byteArrayOptionContentValuesPutter = new ContentValuesPutter[Option[Array[Byte]]] {
+      def apply(cv: ContentValues, key: String, value: Option[Array[Byte]]) {
+        value map (x => cv.put(key, x)) getOrElse cv.putNull(key)
       }
     }
 
@@ -81,6 +108,29 @@ object SQLite {
       cvputter2(cv, v2._1, v2._2)
       cvputter3(cv, v3._1, v3._2)
       cvputter4(cv, v4._1, v4._2)
+      cv
+    }
+
+    def apply[T1, T2, T3, T4, T5](v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4), v5: (String, T5))
+                             (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4], cvputter5: ContentValuesPutter[T5]): ContentValues = {
+      val cv = new ContentValues(5)
+      cvputter1(cv, v1._1, v1._2)
+      cvputter2(cv, v2._1, v2._2)
+      cvputter3(cv, v3._1, v3._2)
+      cvputter4(cv, v4._1, v4._2)
+      cvputter5(cv, v5._1, v5._2)
+      cv
+    }
+
+    def apply[T1, T2, T3, T4, T5, T6](v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4), v5: (String, T5), v6: (String, T6))
+                                 (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4], cvputter5: ContentValuesPutter[T5], cvputter6: ContentValuesPutter[T6]): ContentValues = {
+      val cv = new ContentValues(6)
+      cvputter1(cv, v1._1, v1._2)
+      cvputter2(cv, v2._1, v2._2)
+      cvputter3(cv, v3._1, v3._2)
+      cvputter4(cv, v4._1, v4._2)
+      cvputter5(cv, v5._1, v5._2)
+      cvputter6(cv, v6._1, v6._2)
       cv
     }
   }
@@ -145,6 +195,12 @@ object SQLite {
       if (result == -1) None else Some(result)
     }
 
+    def insert[T1, T2, T3, T4, T5](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4), v5: (String, T5))
+                              (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4], cvputter5: ContentValuesPutter[T5]): Option[Long] = {
+      val result = db.insert(table, null, ContentValuesHelper(v1, v2, v3, v4, v5))
+      if (result == -1) None else Some(result)
+    }
+
     def replace[T1, T2](table: String, v1: (String, T1), v2: (String, T2))
                    (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2]): Option[Long] = {
       val result = db.replace(table, null, ContentValuesHelper(v1, v2))
@@ -160,6 +216,18 @@ object SQLite {
     def replace[T1, T2, T3, T4](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4))
                            (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4]): Option[Long] = {
       val result = db.replace(table, null, ContentValuesHelper(v1, v2, v3, v4))
+      if (result == -1) None else Some(result)
+    }
+
+    def replace[T1, T2, T3, T4, T5](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4), v5: (String, T5))
+                               (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4], cvputter5: ContentValuesPutter[T5]): Option[Long] = {
+      val result = db.replace(table, null, ContentValuesHelper(v1, v2, v3, v4, v5))
+      if (result == -1) None else Some(result)
+    }
+
+    def replace[T1, T2, T3, T4, T5, T6](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4), v5: (String, T5), v6: (String, T6))
+                                   (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4], cvputter5: ContentValuesPutter[T5], cvputter6: ContentValuesPutter[T6]): Option[Long] = {
+      val result = db.replace(table, null, ContentValuesHelper(v1, v2, v3, v4, v5, v6))
       if (result == -1) None else Some(result)
     }
 
@@ -335,6 +403,27 @@ object SQLite {
       toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1, f2, f3, f4, f5, f6, f7, f8)
     }
 
+    def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String)
+                                                       (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9])
+                                                       :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] = {
+      cursor.moveToPosition(-1)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1, f2, f3, f4, f5, f6, f7, f8, f9)
+    }
+
+    def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String)
+                                                            (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10])
+                                                            :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] = {
+      cursor.moveToPosition(-1)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10)
+    }
+
+    def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, f11: String)
+                                                            (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10], get11: CursorGetter[T11])
+                                                            :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] = {
+      cursor.moveToPosition(-1)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11)
+    }
+
     private def cursor2map(cursor: AC): Map[String, String] =
       cursor.getColumnNames.map(name =>
         (name, cursor.getString(cursor.getColumnIndex(name)))).toMap
@@ -395,6 +484,63 @@ object SQLite {
          get6.get(cursor, cursor.getColumnIndex(f6)),
          get7.get(cursor, cursor.getColumnIndex(f7)),
          get8.get(cursor, cursor.getColumnIndex(f8))) +: acc)
+    }
+
+    @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] = List.empty)
+                                                                              (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9])
+                                                                              :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+      if (cursor.isAfterLast) acc
+      else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1, f2, f3, f4, f5, f6, f7, f8, f9,
+        (get1.get(cursor, cursor.getColumnIndex(f1)),
+         get2.get(cursor, cursor.getColumnIndex(f2)),
+         get3.get(cursor, cursor.getColumnIndex(f3)),
+         get4.get(cursor, cursor.getColumnIndex(f4)),
+         get5.get(cursor, cursor.getColumnIndex(f5)),
+         get6.get(cursor, cursor.getColumnIndex(f6)),
+         get7.get(cursor, cursor.getColumnIndex(f7)),
+         get8.get(cursor, cursor.getColumnIndex(f8)),
+         get9.get(cursor, cursor.getColumnIndex(f9))) +: acc)
+    }
+
+    @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] = List.empty)
+                                                                                   (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10])
+                                                                                   :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+      if (cursor.isAfterLast) acc
+      else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10,
+        (get1.get(cursor, cursor.getColumnIndex(f1)),
+          get2.get(cursor, cursor.getColumnIndex(f2)),
+          get3.get(cursor, cursor.getColumnIndex(f3)),
+          get4.get(cursor, cursor.getColumnIndex(f4)),
+          get5.get(cursor, cursor.getColumnIndex(f5)),
+          get6.get(cursor, cursor.getColumnIndex(f6)),
+          get7.get(cursor, cursor.getColumnIndex(f7)),
+          get8.get(cursor, cursor.getColumnIndex(f8)),
+          get9.get(cursor, cursor.getColumnIndex(f9)),
+          get10.get(cursor, cursor.getColumnIndex(f10))) +: acc)
+    }
+
+    @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, f11: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] = List.empty)
+                                                                                        (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10], get11: CursorGetter[T11])
+                                                                                        :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+      if (cursor.isAfterLast) acc
+      else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11,
+        (get1.get(cursor, cursor.getColumnIndex(f1)),
+          get2.get(cursor, cursor.getColumnIndex(f2)),
+          get3.get(cursor, cursor.getColumnIndex(f3)),
+          get4.get(cursor, cursor.getColumnIndex(f4)),
+          get5.get(cursor, cursor.getColumnIndex(f5)),
+          get6.get(cursor, cursor.getColumnIndex(f6)),
+          get7.get(cursor, cursor.getColumnIndex(f7)),
+          get8.get(cursor, cursor.getColumnIndex(f8)),
+          get9.get(cursor, cursor.getColumnIndex(f9)),
+          get10.get(cursor, cursor.getColumnIndex(f10)),
+          get11.get(cursor, cursor.getColumnIndex(f11))) +: acc)
     }
 
     // Use when SELECT COUNT(*) type query was used
