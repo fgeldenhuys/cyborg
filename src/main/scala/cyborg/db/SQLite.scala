@@ -19,6 +19,7 @@ object SQLite {
 
   case class FailTransaction() extends Exception
   def failTransaction() { throw FailTransaction() }
+  case class InvalidColumnException(name: String) extends Exception(s"Invalid column name '$name'")
 
   object ContentValuesHelper {
     trait ContentValuesPutter[T] {
@@ -365,13 +366,20 @@ object SQLite {
 
     def isEmpty: Boolean = cursor.getCount == 0
 
+    def columnIndex(name: String): Int = {
+      cursor.getColumnIndex(name) match {
+        case index if index >= 0 => index
+        case _ => throw InvalidColumnException(name)
+      }
+    }
+
     def toColumnIterator[A](c1: String)(implicit getter: CursorGetter[A]): CursorColumnIterator[A] =
-      new CursorColumnIterator[A](cursor, cursor.getColumnIndex(c1))
+      new CursorColumnIterator[A](cursor, cursor.columnIndex(c1))
 
     def toColumnIterator[A1, A2](c1: String, c2: String)
                                 (implicit getter1: CursorGetter[A1], getter2: CursorGetter[A2]):
                                 Cursor2ColumnIterator[A1, A2] =
-      new Cursor2ColumnIterator[A1, A2](cursor, cursor.getColumnIndex(c1), cursor.getColumnIndex(c2))
+      new Cursor2ColumnIterator[A1, A2](cursor, cursor.columnIndex(c1), cursor.columnIndex(c2))
 
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)
@@ -426,11 +434,11 @@ object SQLite {
 
     private def cursor2map(cursor: AC): Map[String, String] =
       cursor.getColumnNames.map(name =>
-        (name, cursor.getString(cursor.getColumnIndex(name)))).toMap
+        (name, cursor.getString(cursor.columnIndex(name)))).toMap
 
     private def cursor2blobMap(cursor: AC): Map[String, StringOrBlob] = {
       cursor.getColumnNames.map { name =>
-        val index = cursor.getColumnIndex(name)
+        val index = cursor.columnIndex(name)
         if (cursor.getType(index) == AC.FIELD_TYPE_BLOB)
           (name, Right(cursor.getBlob(index)))
         else
@@ -451,7 +459,7 @@ object SQLite {
       else cursor.moveToNext()
 
       if (cursor.isAfterLast) acc
-      else toListHelperWithField(field, cursor.getString(cursor.getColumnIndex(field)) +: acc)
+      else toListHelperWithField(field, cursor.getString(cursor.columnIndex(field)) +: acc)
     }
 
     @tailrec private def toBlobListHelper(acc: List[Map[String, StringOrBlob]] = List.empty): List[Map[String, StringOrBlob]] = {
@@ -466,7 +474,7 @@ object SQLite {
       if (cursor.isBeforeFirst) cursor.moveToFirst()
       else cursor.moveToNext()
       if (cursor.isAfterLast) acc
-      else toTypedListHelper[T](field, getter.get(cursor, cursor.getColumnIndex(field)) +: acc)
+      else toTypedListHelper[T](field, getter.get(cursor, cursor.columnIndex(field)) +: acc)
     }
 
     @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8)] = List.empty)
@@ -476,14 +484,14 @@ object SQLite {
       else cursor.moveToNext()
       if (cursor.isAfterLast) acc
       else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1, f2, f3, f4, f5, f6, f7, f8,
-        (get1.get(cursor, cursor.getColumnIndex(f1)),
-         get2.get(cursor, cursor.getColumnIndex(f2)),
-         get3.get(cursor, cursor.getColumnIndex(f3)),
-         get4.get(cursor, cursor.getColumnIndex(f4)),
-         get5.get(cursor, cursor.getColumnIndex(f5)),
-         get6.get(cursor, cursor.getColumnIndex(f6)),
-         get7.get(cursor, cursor.getColumnIndex(f7)),
-         get8.get(cursor, cursor.getColumnIndex(f8))) +: acc)
+        (get1.get(cursor, cursor.columnIndex(f1)),
+         get2.get(cursor, cursor.columnIndex(f2)),
+         get3.get(cursor, cursor.columnIndex(f3)),
+         get4.get(cursor, cursor.columnIndex(f4)),
+         get5.get(cursor, cursor.columnIndex(f5)),
+         get6.get(cursor, cursor.columnIndex(f6)),
+         get7.get(cursor, cursor.columnIndex(f7)),
+         get8.get(cursor, cursor.columnIndex(f8))) +: acc)
     }
 
     @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] = List.empty)
@@ -493,15 +501,15 @@ object SQLite {
       else cursor.moveToNext()
       if (cursor.isAfterLast) acc
       else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1, f2, f3, f4, f5, f6, f7, f8, f9,
-        (get1.get(cursor, cursor.getColumnIndex(f1)),
-         get2.get(cursor, cursor.getColumnIndex(f2)),
-         get3.get(cursor, cursor.getColumnIndex(f3)),
-         get4.get(cursor, cursor.getColumnIndex(f4)),
-         get5.get(cursor, cursor.getColumnIndex(f5)),
-         get6.get(cursor, cursor.getColumnIndex(f6)),
-         get7.get(cursor, cursor.getColumnIndex(f7)),
-         get8.get(cursor, cursor.getColumnIndex(f8)),
-         get9.get(cursor, cursor.getColumnIndex(f9))) +: acc)
+        (get1.get(cursor, cursor.columnIndex(f1)),
+         get2.get(cursor, cursor.columnIndex(f2)),
+         get3.get(cursor, cursor.columnIndex(f3)),
+         get4.get(cursor, cursor.columnIndex(f4)),
+         get5.get(cursor, cursor.columnIndex(f5)),
+         get6.get(cursor, cursor.columnIndex(f6)),
+         get7.get(cursor, cursor.columnIndex(f7)),
+         get8.get(cursor, cursor.columnIndex(f8)),
+         get9.get(cursor, cursor.columnIndex(f9))) +: acc)
     }
 
     @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] = List.empty)
@@ -511,16 +519,16 @@ object SQLite {
       else cursor.moveToNext()
       if (cursor.isAfterLast) acc
       else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10,
-        (get1.get(cursor, cursor.getColumnIndex(f1)),
-          get2.get(cursor, cursor.getColumnIndex(f2)),
-          get3.get(cursor, cursor.getColumnIndex(f3)),
-          get4.get(cursor, cursor.getColumnIndex(f4)),
-          get5.get(cursor, cursor.getColumnIndex(f5)),
-          get6.get(cursor, cursor.getColumnIndex(f6)),
-          get7.get(cursor, cursor.getColumnIndex(f7)),
-          get8.get(cursor, cursor.getColumnIndex(f8)),
-          get9.get(cursor, cursor.getColumnIndex(f9)),
-          get10.get(cursor, cursor.getColumnIndex(f10))) +: acc)
+        (get1.get(cursor, cursor.columnIndex(f1)),
+          get2.get(cursor, cursor.columnIndex(f2)),
+          get3.get(cursor, cursor.columnIndex(f3)),
+          get4.get(cursor, cursor.columnIndex(f4)),
+          get5.get(cursor, cursor.columnIndex(f5)),
+          get6.get(cursor, cursor.columnIndex(f6)),
+          get7.get(cursor, cursor.columnIndex(f7)),
+          get8.get(cursor, cursor.columnIndex(f8)),
+          get9.get(cursor, cursor.columnIndex(f9)),
+          get10.get(cursor, cursor.columnIndex(f10))) +: acc)
     }
 
     @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, f11: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] = List.empty)
@@ -530,17 +538,17 @@ object SQLite {
       else cursor.moveToNext()
       if (cursor.isAfterLast) acc
       else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11,
-        (get1.get(cursor, cursor.getColumnIndex(f1)),
-          get2.get(cursor, cursor.getColumnIndex(f2)),
-          get3.get(cursor, cursor.getColumnIndex(f3)),
-          get4.get(cursor, cursor.getColumnIndex(f4)),
-          get5.get(cursor, cursor.getColumnIndex(f5)),
-          get6.get(cursor, cursor.getColumnIndex(f6)),
-          get7.get(cursor, cursor.getColumnIndex(f7)),
-          get8.get(cursor, cursor.getColumnIndex(f8)),
-          get9.get(cursor, cursor.getColumnIndex(f9)),
-          get10.get(cursor, cursor.getColumnIndex(f10)),
-          get11.get(cursor, cursor.getColumnIndex(f11))) +: acc)
+        (get1.get(cursor, cursor.columnIndex(f1)),
+          get2.get(cursor, cursor.columnIndex(f2)),
+          get3.get(cursor, cursor.columnIndex(f3)),
+          get4.get(cursor, cursor.columnIndex(f4)),
+          get5.get(cursor, cursor.columnIndex(f5)),
+          get6.get(cursor, cursor.columnIndex(f6)),
+          get7.get(cursor, cursor.columnIndex(f7)),
+          get8.get(cursor, cursor.columnIndex(f8)),
+          get9.get(cursor, cursor.columnIndex(f9)),
+          get10.get(cursor, cursor.columnIndex(f10)),
+          get11.get(cursor, cursor.columnIndex(f11))) +: acc)
     }
 
     // Use when SELECT COUNT(*) type query was used
