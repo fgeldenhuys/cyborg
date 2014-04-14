@@ -247,6 +247,16 @@ object SQLite {
                           (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3]): Int =
       db.update(table, ContentValuesHelper(v1, v2, v3), whereClause, whereArgs.map(_.toString).toArray)
 
+    def update[T1, T2, T3, T4](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4),
+                                   whereClause: String, whereArgs: Any*)
+                                  (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4]): Int =
+      db.update(table, ContentValuesHelper(v1, v2, v3, v4), whereClause, whereArgs.map(_.toString).toArray)
+
+    def update[T1, T2, T3, T4, T5](table: String, v1: (String, T1), v2: (String, T2), v3: (String, T3), v4: (String, T4), v5: (String, T5),
+                           whereClause: String, whereArgs: Any*)
+                          (implicit cvputter1: ContentValuesPutter[T1], cvputter2: ContentValuesPutter[T2], cvputter3: ContentValuesPutter[T3], cvputter4: ContentValuesPutter[T4], cvputter5: ContentValuesPutter[T5]): Int =
+      db.update(table, ContentValuesHelper(v1, v2, v3, v4, v5), whereClause, whereArgs.map(_.toString).toArray)
+
   }
 
   abstract class OpenHelper(name: String,
