@@ -394,52 +394,52 @@ object SQLite {
     def toList: List[Map[String, String]] = {
       cursor.moveToPosition(-1)
       val result = toListHelper()
-      result
+      result.reverse
     }
 
     def toList(field: String): List[String] = {
       cursor.moveToPosition(-1)
       val result = toListHelperWithField(field)
-      result
+      result.reverse
     }
 
     def toBlobList: List[Map[String, StringOrBlob]] = {
       cursor.moveToPosition(-1)
       val result = toBlobListHelper()
-      result
+      result.reverse
     }
 
     def toTypedList[T](field: String)(implicit getter: CursorGetter[T]): List[T] = {
       cursor.moveToPosition(-1)
-      toTypedListHelper[T](field)
+      toTypedListHelper[T](field).reverse
     }
 
     def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String)
                                                    (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8])
                                                    :List[(T1, T2, T3, T4, T5, T6, T7, T8)] = {
       cursor.moveToPosition(-1)
-      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1, f2, f3, f4, f5, f6, f7, f8)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8](f1, f2, f3, f4, f5, f6, f7, f8).reverse
     }
 
     def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String)
                                                        (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9])
                                                        :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] = {
       cursor.moveToPosition(-1)
-      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1, f2, f3, f4, f5, f6, f7, f8, f9)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9](f1, f2, f3, f4, f5, f6, f7, f8, f9).reverse
     }
 
     def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String)
                                                             (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10])
                                                             :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] = {
       cursor.moveToPosition(-1)
-      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10).reverse
     }
 
     def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, f11: String)
                                                             (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10], get11: CursorGetter[T11])
                                                             :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] = {
       cursor.moveToPosition(-1)
-      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11).reverse
     }
 
     private def cursor2map(cursor: AC): Map[String, String] =
