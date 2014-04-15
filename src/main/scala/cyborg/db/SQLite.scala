@@ -442,6 +442,13 @@ object SQLite {
       toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11).reverse
     }
 
+    def toTypedList[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, f11: String, f12: String)
+                                                                      (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10], get11: CursorGetter[T11], get12: CursorGetter[T12])
+                                                                      :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12)] = {
+      cursor.moveToPosition(-1)
+      toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12).reverse
+    }
+
     private def cursor2map(cursor: AC): Map[String, String] =
       cursor.getColumnNames.map(name =>
         (name, cursor.getString(cursor.columnIndex(name)))).toMap
@@ -559,6 +566,27 @@ object SQLite {
           get9.get(cursor, cursor.columnIndex(f9)),
           get10.get(cursor, cursor.columnIndex(f10)),
           get11.get(cursor, cursor.columnIndex(f11))) +: acc)
+    }
+
+    @tailrec private def toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12](f1: String, f2: String, f3: String, f4: String, f5: String, f6: String, f7: String, f8: String, f9: String, f10: String, f11: String, f12: String, acc: List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12)] = List.empty)
+                                                                                        (implicit get1: CursorGetter[T1], get2: CursorGetter[T2], get3: CursorGetter[T3], get4: CursorGetter[T4], get5: CursorGetter[T5], get6: CursorGetter[T6], get7: CursorGetter[T7], get8: CursorGetter[T8], get9: CursorGetter[T9], get10: CursorGetter[T10], get11: CursorGetter[T11], get12: CursorGetter[T12])
+                                                                                        :List[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12)] = {
+      if (cursor.isBeforeFirst) cursor.moveToFirst()
+      else cursor.moveToNext()
+      if (cursor.isAfterLast) acc
+      else toTypedListHelper[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12](f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12,
+        (get1.get(cursor, cursor.columnIndex(f1)),
+          get2.get(cursor, cursor.columnIndex(f2)),
+          get3.get(cursor, cursor.columnIndex(f3)),
+          get4.get(cursor, cursor.columnIndex(f4)),
+          get5.get(cursor, cursor.columnIndex(f5)),
+          get6.get(cursor, cursor.columnIndex(f6)),
+          get7.get(cursor, cursor.columnIndex(f7)),
+          get8.get(cursor, cursor.columnIndex(f8)),
+          get9.get(cursor, cursor.columnIndex(f9)),
+          get10.get(cursor, cursor.columnIndex(f10)),
+          get11.get(cursor, cursor.columnIndex(f11)),
+          get12.get(cursor, cursor.columnIndex(f12))) +: acc)
     }
 
     // Use when SELECT COUNT(*) type query was used
