@@ -17,6 +17,9 @@ object Bitmap {
   }
 
   implicit class CyborgBitmapExt(val b: B) extends AnyVal {
+    def height = b.getHeight
+    def width = b.getWidth
+
     def compressedBytes(format: BitmapFormat.Format): Option[Array[Byte]] = {
       val out = new ByteArrayOutputStream()
       val success = b.compress(format.format, format.quality, out)
