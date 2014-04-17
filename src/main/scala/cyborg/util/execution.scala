@@ -123,7 +123,7 @@ object execution {
     }
   }
 
-  class ExecutionTimer(val start: Long, val name: String) {
+  class ExecutionTimer(val start: Long, val name: String, val silent: Boolean) {
     var lastCheckpoint: Long = start
     lazy val averageTimes = mutable.HashMap.empty[String, (Int, Long)]
 
@@ -134,7 +134,7 @@ object execution {
       val t = now - start
       val split = now - lastCheckpoint
       lastCheckpoint = now
-      $d(s"$name +$t ($split) $message")
+      if (!silent) $d(s"$name +$t ($split) $message")
       split.milliseconds
     }
 
@@ -151,6 +151,12 @@ object execution {
       (for ((message, (n, time)) <- averageTimes.toMap) yield
         s"$message \t $time / $n = ${time / n} ms").mkString("\n")
 
+    def printReport() {
+      if (!silent) {
+        $d(s"$name average checkpoints report:\n$averageReport")
+      }
+    }
+
     def silentCheckpoint: Duration = {
       val now = systemTime
       val split = now - lastCheckpoint
@@ -159,5 +165,5 @@ object execution {
     }
 
   }
-  def startTimer(name: String = "TIMER") = new ExecutionTimer(systemTime, name)
+  def startTimer(name: String = "TIMER", silent: Boolean = false) = new ExecutionTimer(systemTime, name, silent)
 }

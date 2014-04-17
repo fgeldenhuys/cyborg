@@ -27,6 +27,6 @@ public class Execution {
     }
 
     public static ExecutionTimer startTimer(String name) {
-        return new ExecutionTimer(new execution.ExecutionTimer(execution$.MODULE$.systemTime(), name));
+        return new ExecutionTimer(new execution.ExecutionTimer(execution$.MODULE$.systemTime(), name, false));
     }
 }
