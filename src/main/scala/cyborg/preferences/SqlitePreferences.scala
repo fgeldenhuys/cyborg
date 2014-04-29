@@ -77,6 +77,10 @@ object SqlitePreferences {
         helper.write(db => prop.setAdd(db, section, key, value))
       }
 
+      def replaceWith[T](list: List[T])(implicit prop: PrefProp[T]) {
+        helper.write(db => prop.setReplace(db, section, key, list))
+      }
+
       def -= [T](value: T)(implicit prop: PrefProp[T]) {
         helper.write(db => prop.setRemove(db, section, key, value))
       }
@@ -221,13 +225,40 @@ object SqlitePreferences {
             }
           }
           else if (check.get[Int]("setValue").exists(_ == 1)) { // Already a set
-            check.get[Int]("value") map { prime =>
-              db.insert("sets", "section" -> section, "setId" -> prime, "value" -> value)(stringContentValuesPutter, intContentValuesPutter, putter)
+            check.get[Long]("value") map { prime =>
+              db.insert("sets", "section" -> section, "setId" -> prime, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
             }
           }
           else { // Assuming there is a previous non-set value assigned to this key
             getSetId(db) map { setId =>
               db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
+              db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
+            }
+          }
+        }
+      }
+    }
+
+    def setReplace(db: SQLiteDatabase, section: String, key: String, values: List[T]) {
+      db.transaction { db =>
+        db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
+          if (check.isEmpty) { // New set, no previous value
+            getSetId(db) map { setId =>
+              db.insert("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
+              setId
+            }
+          }
+          else if (check.get[Int]("setValue").exists(_ == 1)) { // Already a set
+            check.get[Long]("value")
+          }
+          else { // Assuming there is a previous non-set value assigned to this key
+            getSetId(db) map { setId =>
+              db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
+              setId
+            }
+          } map { setId =>
+            db.delete("sets", "section = ? AND setId = ?", section, setId)
+            values foreach { value =>
               db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
             }
           }
