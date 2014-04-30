@@ -242,7 +242,7 @@ object SqlitePreferences {
     def setReplace(db: SQLiteDatabase, section: String, key: String, values: List[T]) {
       db.transaction { db =>
         db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
-          if (check.isEmpty) { // New set, no previous value
+          val optSetId = if (check.isEmpty) { // New set, no previous value
             getSetId(db) map { setId =>
               db.insert("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
               setId
@@ -256,11 +256,14 @@ object SqlitePreferences {
               db.replace("prime", "section" -> section, "key" -> key, "value" -> setId, "setValue" -> 1)
               setId
             }
-          } map { setId =>
+          }
+          optSetId map { setId =>
             db.delete("sets", "section = ? AND setId = ?", section, setId)
             values foreach { value =>
               db.insert("sets", "section" -> section, "setId" -> setId, "value" -> value)(stringContentValuesPutter, longContentValuesPutter, putter)
             }
+          } getOrElse {
+            $e(s"CONFIG failed to get a set id for '$key'")
           }
         }
       }
