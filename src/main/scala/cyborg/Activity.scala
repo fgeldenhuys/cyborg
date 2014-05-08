@@ -83,6 +83,30 @@ object Activity {
     p.future
   }
 
+  def confirm(title: String, message: String)
+             (implicit activity: android.app.Activity): Future[Boolean] = {
+    val p = promise[Boolean]
+    try {
+      val dialog = new AlertDialog.Builder(activity)
+      dialog.setTitle(title).setMessage(message)
+      dialog.setPositiveButton("Yes", new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int) { p success true }
+      })
+      dialog.setNegativeButton("No", new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int) { p success false }
+      })
+      activity.runOnUiThread(new Runnable {
+        override def run() { dialog.show() }
+      })
+    }
+    catch {
+      case e: Exception =>
+        e.printStackTrace()
+        p failure e
+    }
+    p.future
+  }
+
   def prompt(title: String, message: String, text: String = "")
             (implicit activity: android.app.Activity): Future[Option[String]] = {
     val p = promise[Option[String]]
