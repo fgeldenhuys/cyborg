@@ -30,12 +30,15 @@ object HttpSecure extends Http {
     }
   }
 
-  def makeSslSocketFactoryFromKeyStore(keyStoreRes: Int, password: String)
-                                      (implicit context: Context): SSLSocketFactory = {
+  def keyStore(keyStoreRes: Int, password: String)(implicit context: Context) = {
     val keyStore = KeyStore.getInstance("BKS")
     val in = context.resources.openRawResource(keyStoreRes)
     keyStore.load(in, password.toCharArray)
     in.close()
+    keyStore
+  }
+
+  def makeSslSocketFactoryFromKeyStore(keyStore: KeyStore): SSLSocketFactory = {
     val tmf = TrustManagerFactory.getInstance("X509")
     tmf.init(keyStore)
     val ssl = SSLContext.getInstance("TLS")
