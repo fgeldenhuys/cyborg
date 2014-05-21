@@ -187,7 +187,7 @@ trait Http {
         case Right(http) =>
           try {
             val rawData = data.utf8
-            http.setRequestMethod("POST")
+            http.setRequestMethod("PUT")
             http.setRequestProperty("Content-Type", contentType)
             http.setDoOutput(true)
             http.setFixedLengthStreamingMode(rawData.size)
