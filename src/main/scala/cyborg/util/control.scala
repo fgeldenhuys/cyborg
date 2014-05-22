@@ -21,8 +21,6 @@ object control {
       if (x.isDefined) x
       else { f; x }
     }
-
-    def \/?[B](l: B): B \/ A = x map (\/-(_)) getOrElse -\/(l)
   }
 
   def stackTraceHandler[T](failed: T) = handling(classOf[Exception]) by { ex =>
