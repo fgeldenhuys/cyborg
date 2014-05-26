@@ -45,12 +45,6 @@ object Intent {
       for (extras <- intent.extras; value <- Option(extras.getBoolean(key))) yield value
     def set(intent: AIntent, key: String, value: Boolean): Unit = intent.putExtra(key, value)
   }
-  implicit val throwableExtraProp = new ExtraProp[Throwable] {
-    override def get(intent: AIntent, key: String): Option[Throwable] =
-      for (extras <- intent.extras; value <- Option(extras.getSerializable(key).asInstanceOf[Throwable])) yield value
-    override def set(intent: AIntent, key: String, value: Throwable): Unit =
-      intent.putExtra(key, value.asInstanceOf[Serializable])
-  }
 
   implicit class IntentExt(val self: AIntent) /* extends AnyVal */ { // Nested class not allowed
     def start(implicit activity: Activity) { activity.startActivity(self) }
@@ -65,8 +59,9 @@ object Intent {
       context.sendBroadcast(self)
     }
 
-    def makeResult(resultCode: Int)(implicit activity: Activity) = {
-      activity.setResult(resultCode)
+    def makeResult(resultCode: Int)(implicit activity: Activity): AIntent = {
+      activity.setResult(resultCode, self)
+      self
     }
 
     def ->:[A](pair: (String, A))(implicit prop: ExtraProp[A]): AIntent = {
