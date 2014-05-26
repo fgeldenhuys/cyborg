@@ -1,6 +1,7 @@
 package cyborg
 
 import android.content.{Intent => AIntent}
+import android.app.{Activity => AActivity}
 import android.os.Parcelable
 import cyborg.Context._
 import cyborg.util.control._
@@ -56,6 +57,10 @@ object Intent {
 
     def broadcast()(implicit context: Context) {
       context.sendBroadcast(self)
+    }
+
+    def makeResult(resultCode: Int)(implicit activity: Activity) = {
+      activity.setResult(resultCode)
     }
 
     def ->:[A](pair: (String, A))(implicit prop: ExtraProp[A]): AIntent = {
