@@ -37,6 +37,10 @@ class Activity extends android.app.Activity {
 
   def findView[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
 
+  def invalidateRootView() {
+    findViewById(android.R.id.content).invalidate()
+  }
+
   def isLandscape =
     getResources.getConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
