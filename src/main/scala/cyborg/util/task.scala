@@ -6,14 +6,13 @@ import cyborg.Activity
 
 object task {
 
-  implicit class TaskOnUiThreadExt[A](val t: Task[A]) extends AnyVal {
+  // This doesn't work as I expected
+  /*implicit class TaskOnUiThreadExt[A](val t: Task[A]) extends AnyVal {
     def runAsyncUI(f: (Throwable \/ A) => Unit)(implicit a: Activity) {
-      a.runOnUiThread {
-        t.runAsync(f)
+      a runOnUiThread {
+        f(t.attemptRun)
       }
     }
-
-    def runAsyncUI()(implicit a: Activity): Unit = runAsyncUI { _ => Unit }
-  }
+  }*/
 
 }

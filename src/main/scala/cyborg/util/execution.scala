@@ -124,46 +124,68 @@ object execution {
   }
 
   class ExecutionTimer(val start: Long, val name: String, val silent: Boolean) {
-    var lastCheckpoint: Long = start
-    lazy val averageTimes = mutable.HashMap.empty[String, (Int, Long)]
+    // mark is when event happened, t is how long after start of timer, split is how long after previous event
+    case class TimerEvent(mark: Long, t: Long, split: Long, message: String, group: Option[String]) {
+      override def toString: String = s"$name +$t ($split) ${group.fold("")("["+_+"]")} $message"
+    }
+
+    val events = mutable.ListBuffer.empty[TimerEvent]
+
+    def lastEventTime: Long = events.lastOption.fold(start)(_.mark)
 
     def apply(): Duration = (systemTime - start).milliseconds
 
-    def checkpoint(message: String): Duration = {
+    private def _check(message: String, log: Boolean): Duration = {
       val now = systemTime
       val t = now - start
-      val split = now - lastCheckpoint
-      lastCheckpoint = now
-      if (!silent) $d(s"$name +$t ($split) $message")
+      val split = now - lastEventTime
+      val event = TimerEvent(now, t, split, message, None)
+      events += event
+      if (log) $d(event.toString)
       split.milliseconds
     }
 
-    def averageCheckpoint(message: String): Duration = {
+    def check(message: String) = _check(message, !silent)
+    def silentCheck(message: String) = _check(message, log = false)
+
+    def aveCheck(group: String, message: String): Duration = {
       val now = systemTime
-      val split = now - lastCheckpoint
-      lastCheckpoint = now
-      val (n, t) = averageTimes.get(message) getOrElse (0, 0l)
-      averageTimes(message) = (n + 1, t + split)
+      val t = now - start
+      val split = now - lastEventTime
+      val event = TimerEvent(now, t, split, message, Some(group))
+      events += event
       split.milliseconds
     }
 
-    def averageReport: String =
-      (for ((message, (n, time)) <- averageTimes.toMap) yield
-        s"$message \t $time / $n = ${time / n} ms").mkString("\n")
-
-    def printReport() {
-      if (!silent) {
-        $d(s"$name average checkpoints report:\n$averageReport")
+    def groupTotals: List[(String, Int, Long)] = {
+      events.foldLeft(List.empty[(String, Int, Long)]) { (acc, event) =>
+        event.group.fold (acc) { g =>
+          if (acc.exists(_._1 == g)) {
+            acc collect {
+              case (group, n, time) if group == g => (group, n + 1, time + event.split)
+            }
+          }
+          else acc :+ (g, 1, event.split)
+        }
       }
     }
 
-    def silentCheckpoint: Duration = {
-      val now = systemTime
-      val split = now - lastCheckpoint
-      lastCheckpoint = now
-      split.milliseconds
+    def averageReport: String =
+      (for ((group, n, time) <- groupTotals) yield s"$group \t $time / $n = ${time / n} ms").mkString("\n")
+
+    def sortedAverageReport: String = {
+      groupTotals map { gt =>
+        val (group, n, time) = gt
+        (time / n, group, n, time)
+      } sortWith { (x, y) =>
+        x._1 < y._1
+      } map { ga =>
+        val (ave, group, n, time) = ga
+        s"$group \t $time / $n = $ave ms"
+      } mkString "\n"
     }
 
+    def fullReport: String = events mkString "\n"
   }
   def startTimer(name: String = "TIMER", silent: Boolean = false) = new ExecutionTimer(systemTime, name, silent)
 }
