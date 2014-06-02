@@ -124,10 +124,7 @@ object execution {
   }
 
   class ExecutionTimer(val start: Long, val name: String, val silent: Boolean) {
-    // mark is when event happened, t is how long after start of timer, split is how long after previous event
-    case class TimerEvent(mark: Long, t: Long, split: Long, message: String, group: Option[String]) {
-      override def toString: String = s"$name +$t ($split) ${group.fold("")("["+_+"]")} $message"
-    }
+    import ExecutionTimer._
 
     val events = mutable.ListBuffer.empty[TimerEvent]
 
@@ -187,5 +184,34 @@ object execution {
 
     def fullReport: String = events mkString "\n"
   }
+
+  object ExecutionTimer {
+    //import scala.reflect.macros.{Context => MacroContext}
+
+    // mark is when event happened, t is how long after start of timer, split is how long after previous event
+    case class TimerEvent(mark: Long, t: Long, split: Long, message: String, group: Option[String]) {
+      override def toString: String = s"+$t\t($split)\t${group.fold("")("["+_+"]")} $message"
+    }
+
+    /*def _checkImpl(c: MacroContext)
+                  (events: c.Expr[mutable.ListBuffer[TimerEvent]], message: c.Expr[String], log: c.Expr[Boolean],
+                   now: c.Expr[Long], start: c.Expr[Long], lastEvent: c.Expr[Long]): c.Expr[Duration] = {
+      import c.universe._
+      val Literal(Constant(eventsV: mutable.ListBuffer[TimerEvent])) = events.tree
+      val Literal(Constant(messageV: String)) = message.tree
+      val Literal(Constant(logV: Boolean)) = log.tree
+      val Literal(Constant(nowV: Long)) = now.tree
+      val Literal(Constant(startV: Long)) = start.tree
+      val Literal(Constant(lastEventV: Long)) = lastEvent.tree
+      val t = nowV - startV
+      val split = nowV - lastEventV
+      val event = TimerEvent(nowV, t, split, messageV, None)
+      eventsV += event
+      if (logV) $d(event.toString)
+      val duration = split.milliseconds
+      c.Expr[Duration](Literal(Constant(duration)))
+    }*/
+  }
+
   def startTimer(name: String = "TIMER", silent: Boolean = false) = new ExecutionTimer(systemTime, name, silent)
 }

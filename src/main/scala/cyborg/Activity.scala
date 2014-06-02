@@ -1,16 +1,16 @@
 package cyborg
 
 import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.res.Configuration
-import android.content.{BroadcastReceiver, DialogInterface}
 import android.view.inputmethod.InputMethodManager
 import android.view.View
+import android.view.WindowManager.BadTokenException
 import android.widget.{EditText, Toast}
 import Context._
+import cyborg.Log._
 import cyborg.util.events.Observable
 import scala.concurrent._
-import android.view.WindowManager.BadTokenException
-import cyborg.Log._
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -43,6 +43,11 @@ class Activity extends android.app.Activity {
 
   def isLandscape =
     getResources.getConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+  def displaySize: (Int, Int) = {
+    val display = getWindowManager.getDefaultDisplay
+    (display.getWidth, display.getHeight)
+  }
 
   def hideKeyboard() {
     val inputManager = getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
