@@ -11,6 +11,7 @@ import Context._
 import cyborg.Log._
 import cyborg.util.events.Observable
 import scala.concurrent._
+import android.graphics.Rect
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -44,9 +45,15 @@ class Activity extends android.app.Activity {
   def isLandscape =
     getResources.getConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-  def displaySize: (Int, Int) = {
+  def screenSize: (Int, Int) = {
     val display = getWindowManager.getDefaultDisplay
     (display.getWidth, display.getHeight)
+  }
+
+  def displaySize: (Int, Int) = {
+    val rect = new Rect()
+    getWindow.getDecorView.getWindowVisibleDisplayFrame(rect)
+    (rect.width(), rect.height())
   }
 
   def hideKeyboard() {

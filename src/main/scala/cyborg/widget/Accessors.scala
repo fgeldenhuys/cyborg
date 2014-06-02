@@ -10,8 +10,10 @@ object Accessors {
     def clickable = v.isClickable
     def clickable_=(b: Boolean) { v.setClickable(b) }
     def find[A](r: ViewResource[A]) = v.findViewById(r.id).asInstanceOf[A]
+    def height = v.getHeight
     def visible = v.getVisibility == View.VISIBLE
     def visible_=(b: Boolean) { v.setVisibility(if (b) View.VISIBLE else View.INVISIBLE) }
+    def width = v.getWidth
   }
 
   implicit class ButtonAccessors(val b: android.widget.Button) extends AnyVal {
