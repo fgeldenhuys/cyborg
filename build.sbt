@@ -19,5 +19,6 @@ libraryDependencies := Seq(
   "org.scala-lang" % "scala-library" % "2.10.4",
   "org.scala-lang" % "scala-reflect" % "2.10.4",
   "org.scalaz" %% "scalaz-core" % "7.0.4",
-  "org.scalaz" %% "scalaz-concurrent" % "7.0.4"
+  "org.scalaz" %% "scalaz-concurrent" % "7.0.4",
+  "io.dylemma" %% "scala-frp" % "1.1"
 )
