@@ -102,5 +102,11 @@ object Intent {
     def apply() = new AIntent()
     def apply[A](implicit context: Context, m: Manifest[A]) = new AIntent(context, /* m.runtimeClass*/ m.erasure)
     def apply(action: String) = new AIntent(action)
+
+    def view(data: android.net.Uri, tpe: String) = {
+      val i = new AIntent(AIntent.ACTION_VIEW)
+      i.setDataAndType(data, tpe)
+      i
+    }
   }
 }
