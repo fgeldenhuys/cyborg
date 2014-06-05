@@ -74,7 +74,7 @@ object binary {
 
   implicit class StringCyborgBinaryExt(val string: String) extends AnyVal {
     def decodeBase64: Array[Byte] = Base64.decode(string, Base64.DEFAULT)
-    def utf8: Array[Byte] = string.getBytes("UTF8")
+    def utf8: Array[Byte] = string.getBytes("UTF-8")
   }
 
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))

@@ -30,6 +30,8 @@ object io {
 
   def openFile(path: String) = tryEither(new File(path))
   def openExistingFile(path: String) = openFile(path).toOption.filter(_.exists())
+  def openTempFile(prefix: String, suffix: String, directory: File = null) =
+    tryEither(File.createTempFile(prefix, suffix, directory))
   def fileExists(path: String) = openFile(path) exists (_.exists())
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
