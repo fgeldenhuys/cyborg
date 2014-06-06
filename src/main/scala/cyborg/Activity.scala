@@ -3,6 +3,7 @@ package cyborg
 import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.res.Configuration
+import android.graphics.Rect
 import android.view.inputmethod.InputMethodManager
 import android.view.View
 import android.view.WindowManager.BadTokenException
@@ -10,8 +11,8 @@ import android.widget.{EditText, Toast}
 import Context._
 import cyborg.Log._
 import cyborg.util.events.Observable
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent._
-import android.graphics.Rect
 
 class Activity extends android.app.Activity {
   implicit val context: Context = this
@@ -66,12 +67,48 @@ class Activity extends android.app.Activity {
 }
 
 object Activity {
+  sealed trait ActivityResultCode { def code: Int }
+  case class ActivityResultOk(code: Int = android.app.Activity.RESULT_OK) extends ActivityResultCode
+  case class ActivityResultCanceled(code: Int = android.app.Activity.RESULT_CANCELED) extends ActivityResultCode
+
   val ResultOk = android.app.Activity.RESULT_OK
   val ResultCanceled = android.app.Activity.RESULT_CANCELED
+
+  def makeResultCode(code: Int): Option[ActivityResultCode] = {
+    code match {
+      case android.app.Activity.RESULT_OK => Some(ActivityResultOk())
+      case android.app.Activity.RESULT_CANCELED => Some(ActivityResultCanceled())
+      case _ => None
+    }
+  }
 
   sealed trait ToastDuration { def value: Int }
   val ToastLong = new ToastDuration { def value = Toast.LENGTH_LONG }
   val ToastShort = new ToastDuration { def value: Int = Toast.LENGTH_SHORT }
+
+  case class ActivityResult(code: ActivityResultCode, data: Option[android.content.Intent])
+
+  class IntentCallbacks {
+    val map = scala.collection.mutable.HashMap.empty[Int, Promise[ActivityResult]]
+    var nextRequestCode = new AtomicInteger(1001)
+
+    def onActivityResult(requestCode: Int, result: ActivityResult): Boolean = {
+      map.get(requestCode).fold (false) { p =>
+        p success result
+        map remove requestCode
+        true
+      }
+    }
+  }
+
+  def startIntentForResult(intent: android.content.Intent)
+                          (implicit activity: Activity, ic: IntentCallbacks): Future[ActivityResult] = {
+    val rc = ic.nextRequestCode.addAndGet(1)
+    val p = promise[ActivityResult]
+    ic.map += ((rc, p))
+    activity.startActivityForResult(intent, rc)
+    p.future
+  }
 
   def toast(message: String, duration: ToastDuration = ToastShort)(implicit activity: android.app.Activity): Toast = {
     val t = Toast.makeText(activity, message, duration.value)
