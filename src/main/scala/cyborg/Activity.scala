@@ -101,6 +101,10 @@ object Activity {
     }
   }
 
+  def runOnUiThread(f: => Any)(implicit activity: Activity) {
+    activity.runOnUiThread(f)
+  }
+
   def startIntentForResult(intent: android.content.Intent)
                           (implicit activity: Activity, ic: IntentCallbacks): Future[ActivityResult] = {
     val rc = ic.nextRequestCode.addAndGet(1)
