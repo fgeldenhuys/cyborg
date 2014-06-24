@@ -1,6 +1,8 @@
 package cyborg.util
 
 import _root_.io.dylemma.frp._
+import scala.concurrent.duration._
+import cyborg.util.execution._
 
 object frp {
   class EventVar[A](initial: A)(implicit obs: Observer) extends EventSource[A] {
@@ -41,4 +43,21 @@ object frp {
     }
   }
 
+  class EventDebouncePipe[A](val parent: EventStream[A], val delay: Duration)
+                            (implicit val sec: ScheduledExecutionContext, obs: Observer) extends EventSource[A] {
+    var task: Option[ScheduledFuture[Unit]] = None
+    private def handle(event: A) {
+      task foreach (_.scheduled.cancel(true))
+      task = Some(execute {
+        fire(event)
+        task = None
+      } afterDelayOf delay)
+    }
+    parent foreach { event: A =>
+      if (!stopped) handle(event)
+    }
+  }
+
+  def debounced[A](parent: EventStream[A], delay: Duration)(implicit sec: ScheduledExecutionContext, obs: Observer) =
+    new EventDebouncePipe[A](parent, delay)
 }
