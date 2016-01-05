@@ -21,7 +21,7 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
   super.setWebChromeClient(chromeClient)
 
   setDownloadListener(new DownloadListener {
-    def onDownloadStart(url: String, userAgent: String, contentDisposition: String, mimetype: String, contentLength: Long) {
+    def onDownloadStart(url: String, userAgent: String, contentDisposition: String, mimetype: String, contentLength: Long): Unit = {
       $w(s"DOWNLOAD url=$url mimetype=$mimetype")
     }
   })
@@ -30,25 +30,43 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
     $d("WebView is being a little bitch again")
   }
 
-  def setWebChromeClient(client: WebChromeClient) {
+  def setWebChromeClient(client: WebChromeClient): Unit = {
     throw new UnsupportedOperationException("The chrome client cannot be changed")
   }
 
-  def safeLoadUrl(url: String) {
+  @deprecated("Use URI parameter") def safeLoadUrl(url: String): Unit = {
+    if (!cyborg.Activity.inUiThread) $e("ERROR this should only be called from the UI thread: " + cyborg.util.debug.getStackTrace)
     WebView.checkUrl(url)
     webViewBitchHandler {
       loadUrl(url)
     }
   }
 
-  def safeLoadUrl(url: String, httpHeaders: Map[String, String]) {
+  def safeLoadUrl(url: URI): Unit = {
+    if (!cyborg.Activity.inUiThread) $e("ERROR this should only be called from the UI thread: " + cyborg.util.debug.getStackTrace)
+    WebView.checkUrl(url)
+    webViewBitchHandler {
+      loadUrl(url.toString)
+    }
+  }
+
+  @deprecated("Use URI parameter") def safeLoadUrl(url: String, httpHeaders: Map[String, String]): Unit = {
+    if (!cyborg.Activity.inUiThread) $e("ERROR this should only be called from the UI thread: " + cyborg.util.debug.getStackTrace)
     WebView.checkUrl(url)
     webViewBitchHandler {
       loadUrl(url, httpHeaders)
     }
   }
 
-  def runJS(js: String) {
+  def safeLoadUrl(url: URI, httpHeaders: Map[String, String]): Unit = {
+    if (!cyborg.Activity.inUiThread) $e("ERROR this should only be called from the UI thread: " + cyborg.util.debug.getStackTrace)
+    WebView.checkUrl(url)
+    webViewBitchHandler {
+      loadUrl(url.toString, httpHeaders)
+    }
+  }
+
+  def runJS(js: String): Unit = {
     handling(classOf[Exception]) by { (ex) =>
       $e(s"Exception during runJS: $ex")
       ex.printStackTrace()
@@ -62,13 +80,14 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
     }
   }
 
-  def callJS(call: String) {
+  def callJS(call: String): Unit = {
     val callWithSemi = if (call.endsWith(";")) call else call + ";"
     val func = call.replaceFirst("\\s*\\(.*$", "")
+    //$i(callWithSemi)
     runJS(s"if(typeof($func)=='function') $callWithSemi else console.warn('$func not defined');")
   }
 
-  def loadJS(filename: String) {
+  def loadJS(filename: String): Unit = {
     $w("This should not be used from Android 4.4 on.")
     catching(classOf[IOException]).opt {
       val in = getContext.getAssets.open(filename)
@@ -84,7 +103,7 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
     } map safeLoadUrl
   }
 
-  def loadCSS(url: String) {
+  def loadCSS(url: String): Unit = {
     runJS(s"""$$("head").append("<link rel='stylesheet' type='text/css' href='$url'/>");""")
   }
 
@@ -123,9 +142,9 @@ class WebView()(implicit val context: Context) extends android.webkit.WebView(co
       if (message.messageLevel == ConsoleMessage.MessageLevel.ERROR ||
         message.messageLevel == ConsoleMessage.MessageLevel.WARNING) {
 
-        if (message.sourceId() == null) {
+        if (message.sourceId() == null || message.sourceId().isEmpty) {
           for (js <- lastRunJS; time <- lastRunTime) {
-            if (message.lineNumber() < js.lines.size && math.abs(SystemClock.uptimeMillis() - time) < 1000) {
+            if (message.lineNumber() <= js.lines.size && math.abs(SystemClock.uptimeMillis() - time) < 1000) {
               $d("Possibly for this code:\n" + js)
             }
           }
@@ -158,7 +177,7 @@ object WebView {
     "Cache-Control" -> "no-cache"
   )
 
-  def checkUrl(url: String) {
+  @deprecated("Use URI parameter") def checkUrl(url: String): Unit = {
     if (!url.startsWith("javascript:")) {
       stackTraceHandler(Nil) {
         URI(url).host.flatMap(x =>
@@ -168,13 +187,25 @@ object WebView {
       }
     }
   }
+
+  def checkUrl(uri: URI): Unit = {
+    if (uri.scheme.exists(_ != "javascript")) {
+      stackTraceHandler(Nil) {
+        uri.host.flatMap(x =>
+          if (x.isEmpty) Some("Android 4.4 does not like zero length hostnames: " + uri)
+          else None
+        ).foreach($w(_))
+      }
+    }
+  }
+
 }
 
 class WebViewClient extends android.webkit.WebViewClient {
   private var previousUrl = "" //for debouncing
   var pageFinishedFunction: Option[() => Unit] = None
 
-  override def onPageFinished(view: webkit.WebView, url: String) {
+  override def onPageFinished(view: webkit.WebView, url: String): Unit = {
     super.onPageFinished(view, url)
     $d(s"PAGE finished current=$url previous=$previousUrl")
     if (url != previousUrl) {
@@ -183,7 +214,7 @@ class WebViewClient extends android.webkit.WebViewClient {
     }
   }
 
-  def whenPageFinished(f: => Unit) {
+  def whenPageFinished(f: => Unit): Unit = {
     pageFinishedFunction = Some(() => f)
   }
 }

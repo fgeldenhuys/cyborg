@@ -15,13 +15,13 @@ class HitMask[A](width: Int, height: Int) {
 
   private def emptyKey: Option[Int] = (1 until 16777216).find(byKey.get(_).isEmpty)
 
-  def clear() { bitmap.eraseColor(Color.Black - (0xFF << 24)) }
+  def clear(): Unit = { bitmap.eraseColor(Color.Black - (0xFF << 24)) }
 
   def key(value: A): Option[AP] = {
     byValue.get(value) orElse {
       emptyKey map { key =>
         byKey(key) = value
-        val paint = Paint(color = (key | Color.OpaqueMask))
+        val paint = Paint(color = Color(key | Color.OpaqueMask))
         byValue(value) = paint
         paint
       }

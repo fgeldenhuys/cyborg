@@ -3,13 +3,13 @@ package cyborg
 import cyborg.Context._
 
 object Units {
-  class DisplayMetric(val value: Double)(implicit context: Context) {
+  implicit class DisplayMetric(val value: Double)(implicit context: Context) {
     def dip: Int = (value * context.getResources.getDisplayMetrics.density).toInt
     def sp: Int = (value * context.getResources.getDisplayMetrics.scaledDensity).toInt
     def pctW: Int = ((value / 100.0) * context.getResources.getDisplayMetrics.widthPixels.toDouble).toInt
     def pctH: Int = ((value / 100.0) * context.getResources.getDisplayMetrics.heightPixels.toDouble).toInt
   }
-  implicit def double2displayMetric(value: Double)(implicit context: Context) = new DisplayMetric(value)(context)
+  //implicit def double2displayMetric(value: Double)(implicit context: Context) = new DisplayMetric(value)(context)
   implicit def int2displayMetric(value: Int)(implicit context: Context) = new DisplayMetric(value)(context)
 
   case class Ltrb(left: Int, top: Int, right: Int, bottom: Int)

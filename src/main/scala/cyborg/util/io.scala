@@ -1,18 +1,241 @@
 package cyborg.util
 
-import android.hardware.usb.{UsbEndpoint, UsbDeviceConnection}
+import java.io._
+import java.nio.channels.Channels
+import java.nio.ByteBuffer
+
+import scala.concurrent._
+import scala.concurrent.duration.Duration
+import scalaz.concurrent.Task
+
+//import android.hardware.usb.{UsbEndpoint, UsbDeviceConnection}
+
+import cyborg.exceptions.JsonParseError
 import cyborg.util.binary._
 import cyborg.util.control._
 import cyborg.util.execution.ScheduledExecutionContext
-import java.io._
-import java.nio.ByteBuffer
-import scala.concurrent._
-import scala.concurrent.duration.Duration
-import scalaz._, Scalaz._
+import cyborg.util.string.Path
+import cyborg.util.task._
+import cyborg.util.scalazext._
+import scalaz._
+import argonaut._
+
 
 object io {
-  val BufferSize = 1024
+  val BufferSize = 1024 * 32
   val MaxBufferSize = 1024 * 1024
+
+
+  // Input Streams
+
+  implicit class InputStreamOps(val in: InputStream) extends AnyVal {
+    def drop(n: Int) = {
+      \/.fromTryCatchNonFatal(in.skip(n.toLong))
+      in
+    }
+
+    // This will read the entire stream, discard the data, and return bytes read
+    // The stream should definitely already be buffered
+    def countBytes: Throwable \/ Long = {
+      \/.fromTryCatchNonFatal {
+        var count = 0l
+        while (in.read() != -1) count += 1
+        in.close()
+        count
+      }
+    }
+  }
+
+
+  trait InputStreamMaker[A] {
+    def makeInputStream(a: A): Throwable \/ InputStream
+  }
+
+  def inputStream[A](a: A)(implicit M: InputStreamMaker[A]) = M.makeInputStream(a)
+
+  def inputStreamByteArrayUpdateReader(in: InputStream)(update: (Array[Byte], Int) => Unit): Throwable \/ Int = {
+    \/.fromTryCatchNonFatal {
+      val buf = new Array[Byte](BufferSize)
+      var n = 0
+      var i = in.read(buf, 0, BufferSize)
+      while (i != -1) {
+        update(buf, i)
+        n += i
+        i = in.read(buf, 0, BufferSize)
+      }
+      n
+    }
+  }
+
+  implicit object StringInputStreamMaker extends InputStreamMaker[String] {
+    override def makeInputStream(a: String): Throwable \/ InputStream =
+      \/.fromTryCatchNonFatal(new ByteArrayInputStream(a.getBytes("UTF-8")))
+  }
+
+  implicit object FileInputStreamMaker extends InputStreamMaker[File] {
+    override def makeInputStream(a: File): Throwable \/ InputStream =
+      \/.fromTryCatchNonFatal(new BufferedInputStream(new FileInputStream(a)))
+  }
+
+  implicit object ByteArrayInputStreamMaker extends InputStreamMaker[Array[Byte]] {
+    override def makeInputStream(a: Array[Byte]): Throwable \/ InputStream =
+      \/.fromTryCatchNonFatal(new ByteArrayInputStream(a))
+  }
+
+
+  trait InputStreamConverter[A] {
+    def readAs(in: InputStream): Throwable \/ A
+  }
+
+  implicit class InputStreamConverterMethods(val in: InputStream) extends AnyVal {
+    def readAs[A](implicit C: InputStreamConverter[A]) = C.readAs(in)
+  }
+
+  implicit class InputStreamThrowableConverterMethods(val either: Throwable \/ InputStream) extends AnyVal {
+    def readAs[A](implicit C: InputStreamConverter[A]) = either.flatMap(C.readAs)
+  }
+
+  implicit object ByteArrayInputStreamConverter extends InputStreamConverter[Array[Byte]] {
+    override def readAs(in: InputStream): Throwable \/ Array[Byte] = \/.fromTryCatchNonFatal {
+      val buffer = new ByteArrayOutputStream()
+      inStream2outStream(in, buffer)
+      in.close()
+      buffer.toByteArray
+    }
+  }
+
+  implicit object StringInputStreamConverter extends InputStreamConverter[String] {
+    override def readAs(in: InputStream): Throwable \/ String =
+      ByteArrayInputStreamConverter.readAs(in).flatMap(x => \/.fromTryCatchNonFatal(new String(x, "UTF-8")))
+  }
+
+  implicit object JsonInputStreamConverter extends InputStreamConverter[Json] {
+    override def readAs(in: InputStream): Throwable \/ Json =
+      StringInputStreamConverter.readAs(in).flatMap(s => Parse.parse(s)
+        .leftMap(e => JsonParseError(e, Some(s))))
+  }
+
+
+
+
+
+
+
+
+  // Output Streams
+  trait WriteToOutputStream[A] {
+    def write(a: A, out: OutputStream, progress: Int => Unit): Task[Int]
+  }
+
+  implicit class WriteToOutputStreamOps[A](val a: A) extends AnyRef {
+    def writeToOutputStreamProgress(out: OutputStream)(progress: Int => Unit)
+                                   (implicit W: WriteToOutputStream[A]): Task[Int] =
+      W.write(a, out, progress)
+
+    def writeToOutputStream(out: OutputStream)(implicit W: WriteToOutputStream[A]): Task[Int] =
+      writeToOutputStreamProgress(out)(_ => Unit)
+
+    def writeToFileProgress(file: File)(progress: Int => Unit)(implicit W: WriteToOutputStream[A]): Task[Int] =
+      Task.delay(new FileOutputStream(file)).flatMap(out => W.write(a, out, progress))
+
+    def writeToFile(file: File)(implicit W: WriteToOutputStream[A]): Task[Int] =
+      writeToFileProgress(file)(_ => Unit)
+
+    def appendToFileProgress(file: File)(progress: Int => Unit)(implicit W: WriteToOutputStream[A]): Task[Int] =
+      Task.delay(new FileOutputStream(file, true)).flatMap(out => W.write(a, out, progress))
+
+    def appendToFile(file: File)(implicit W: WriteToOutputStream[A]): Task[Int] =
+      appendToFileProgress(file)(_ => Unit)
+  }
+
+  implicit object ByteArrayWriteToOutputStream extends WriteToOutputStream[Array[Byte]] {
+    override def write(a: Array[Byte], out: OutputStream, progress: Int => Unit): Task[Int] = Task.delay {
+      for ((p, n) <- (0 to (a.length-1) by BufferSize).map(x => (x, math.min(BufferSize, a.length - x)))) {
+        out.write(a, p, n)
+        progress(p + n)
+      }
+      out.close()
+      a.length
+    }
+  }
+
+  implicit object StringWriteToOutputStream extends WriteToOutputStream[String] {
+    override def write(a: String, out: OutputStream, progress: Int => Unit): Task[Int] =
+      ByteArrayWriteToOutputStream.write(a.getBytes("UTF-8"), out, progress)
+  }
+
+  implicit object StringEitherWriteToOutputStream extends WriteToOutputStream[Throwable \/ String] {
+    override def write(a: Throwable \/ String, out: OutputStream, progress: Int => Unit): Task[Int] =
+      StringWriteToOutputStream.write(a.getOrThrow, out, progress)
+  }
+
+  implicit object InputStreamToOutputStream extends WriteToOutputStream[InputStream] {
+    override def write(a: InputStream, out: OutputStream, progress: (Int) => Unit): Task[Int] = Task.delay {
+      val src = Channels.newChannel(a)
+      val dst = Channels.newChannel(out)
+      val buffer = ByteBuffer.allocateDirect(BufferSize)
+      var n = 0
+      while (src.read(buffer) != -1) {
+        buffer.flip()
+        n += dst.write(buffer)
+        buffer.compact()
+        progress(n)
+      }
+      buffer.flip()
+      while (buffer.hasRemaining) dst.write(buffer)
+      progress(n)
+      n
+    }
+  }
+
+  implicit object InputStreamThrowableToOutputStream extends WriteToOutputStream[Throwable \/ InputStream] {
+    override def write(a: Throwable \/ InputStream, out: OutputStream, progress: (Int) => Unit): Task[Int] = {
+      import cyborg.util.task._
+      Task.delayThrowableV(a).flatMap(InputStreamToOutputStream.write(_, out, progress))
+    }
+  }
+
+
+
+
+
+
+
+  // Files
+
+  trait FileOpener[A] {
+    def openFile(a: A): Throwable \/ File
+  }
+
+  def openFile[A](a: A)(implicit F: FileOpener[A]) = F.openFile(a)
+  def openFileTask[A](a: A)(implicit F: FileOpener[A]) = Task.delayThrowableV(F.openFile(a))
+  def fileExists[A](a: A)(implicit F: FileOpener[A]) = F.openFile(a).exists(_.exists())
+  def fileSize[A](a: A)(implicit F: FileOpener[A]) = F.openFile(a).map(_.length)
+
+  implicit object FileOpenerIdentity extends FileOpener[File] {
+    override def openFile(a: File): Throwable \/ File = \/-(a)
+  }
+
+  implicit object PathFileOpener extends FileOpener[Path] {
+    override def openFile(a: Path): Throwable \/ File = \/.fromTryCatchNonFatal(new File(a.toString))
+  }
+
+  implicit object StringFileOpener extends FileOpener[String] {
+    override def openFile(a: String): Throwable \/ File = \/.fromTryCatchNonFatal(new File(a))
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   case class FileTooLargeException(message: String) extends IOException(message)
 
@@ -28,11 +251,9 @@ object io {
     multiSlashRegex.replaceAllIn(result, "/")
   }
 
-  def openFile(path: String) = tryEither(new File(path))
-  def openExistingFile(path: String) = openFile(path).toOption.filter(_.exists())
+  def openExistingFile(path: String) = openFile(Path(path)).toOption.filter(_.exists())
   def openTempFile(prefix: String, suffix: String, directory: File = null) =
     tryEither(File.createTempFile(prefix, suffix, directory))
-  def fileExists(path: String) = openFile(path) exists (_.exists())
 
   def inStream2outStream(in: InputStream, out: OutputStream): Int = {
     val buf = new Array[Byte](BufferSize)
@@ -95,7 +316,7 @@ object io {
   implicit class OutputStreamCyborgExt(val out: OutputStream) extends AnyVal {
     def << (in: InputStream): OutputStream = { inStream2outStream(in, out); out }
     def << (string: String): OutputStream = { out.write(string.getBytes("UTF-8")); out }
-    def << (byte: Byte): OutputStream = { out.write(byte); out }
+    def << (byte: Byte): OutputStream = { out.write(byte.toInt); out }
     def << (int: Int): OutputStream = { out.write(arrayByteBuffer(4) << int array()); out }
     def << (bytes: Array[Byte]): OutputStream = { out.write(bytes); out }
     def encString (string: String): OutputStream = {
@@ -155,7 +376,7 @@ object io {
 
     def readString: String = new String(read, "UTF-8")
 
-    def write(data: Array[Byte]): Throwable \/ File = \/.fromTryCatch {
+    def write(data: Array[Byte]): Throwable \/ File = \/.fromTryCatchNonFatal {
       val out = new BufferedOutputStream(new FileOutputStream(file))
       out.write(data)
       out.close()
@@ -174,7 +395,7 @@ object io {
       }
     }
 
-    def unzipStream(path: String): Throwable \/ InputStream = \/.fromTryCatch {
+    def unzipStream(path: String): Throwable \/ InputStream = \/.fromTryCatchNonFatal {
       val zip = new java.util.zip.ZipFile(file)
       zip.getInputStream(zip.getEntry(path))
     }
@@ -182,17 +403,33 @@ object io {
     def sha1: Array[Byte] = read.sha1
     def sha1Sample(bytes: Int): Array[Byte] = readBytes(bytes).sha1
 
-    def ls: List[File] = Option(file.listFiles().toList) getOrElse List.empty
+    def ls: Throwable \/ List[File] = \/.fromTryCatchNonFatal(file.listFiles().toList)
   }
 
   implicit class ByteArrayCyborgIOExt(val data: Array[Byte]) extends AnyVal {
-    def writeToFile(file: String) {
+    def writeToFile(file: String): Unit = {
       val out = new FileOutputStream(file)
       out.write(data)
       out.close()
     }
   }
 
+  object ZipExtractors {
+    object ZipFileEntry {
+      def unapply(entry: java.util.zip.ZipEntry): Option[(String, Long, Long)] = entry.isDirectory match {
+        case false => Some((entry.getName, entry.getSize, entry.getTime))
+        case true => None
+      }
+    }
+    object ZipDirectoryEntry {
+      def unapply(entry: java.util.zip.ZipEntry): Option[(String, Long, Long)] = entry.isDirectory match {
+        case true => Some((entry.getName, entry.getSize, entry.getTime))
+        case false => None
+      }
+    }
+  }
+
+  /*
   implicit class UsbDeviceConnectionExt(val udc: UsbDeviceConnection) extends AnyVal {
     def bulkRead(in: UsbEndpoint, bytes: Int, timeout: Duration): Option[Array[Byte]] = {
       val buffer = new Array[Byte](bytes)
@@ -209,25 +446,12 @@ object io {
     }
   }
 
-  object ZipExtractors {
-    object ZipFileEntry {
-      def unapply(entry: java.util.zip.ZipEntry): Option[(String, Long, Long)] = entry.isDirectory match {
-        case false => Some(entry.getName, entry.getSize, entry.getTime)
-        case true => None
-      }
-    }
-    object ZipDirectoryEntry {
-      def unapply(entry: java.util.zip.ZipEntry): Option[(String, Long, Long)] = entry.isDirectory match {
-        case true => Some(entry.getName, entry.getSize, entry.getTime)
-        case false => None
-      }
-    }
-  }
-
   case class Usb(connection: UsbDeviceConnection, in: UsbEndpoint, out: UsbEndpoint) {
     def bulkRead(bytes: Int, timeout: Duration): Option[Array[Byte]] =
       connection.bulkRead(in, bytes, timeout)
     def bulkWrite(data: Array[Byte], timeout: Duration): Boolean =
       connection.bulkWrite(out, data, timeout)
   }
+  */
+
 }

@@ -1,12 +1,29 @@
 package cyborg.util
 
 import java.nio.ByteBuffer
-import scala.util.control.Exception._
-import java.io.ByteArrayOutputStream
 import android.util.Base64
 import java.security.MessageDigest
+import scalaz._, Scalaz._
+import cyborg.util.scalazext._
 
 object binary {
+  implicit object ByteArrayEqual extends Equal[Array[Byte]] {
+    override def equal(a: Array[Byte], b: Array[Byte]): Boolean = {
+      if (a.length == b.length) {
+        var i = 0
+        while (i < a.size) {
+          if (a(i) != b(i)) return false
+          i += 1
+        }
+        true
+      }
+      else false
+    }
+  }
+
+  def byteArrayFromHexString(hs: String): Throwable \/ Array[Byte] =
+    \/.fromTryCatchNonFatal(hs.replaceAll("\\s+", "").grouped(2).map(Integer.parseInt(_, 16).toByte).toArray)
+
   object Bytes {
     val KiB = 1024
     val MiB = KiB * 1024
@@ -17,10 +34,10 @@ object binary {
     import Bytes._
     override def toString = {
       if (bytes < KiB) s"$bytes bytes"
-      else if (bytes < MiB) f"${bytes.toFloat / KiB.toFloat}%.3f KiB"
-      else if (bytes < GiB) f"${bytes.toFloat / MiB.toFloat}%.3f MiB"
-      else if (bytes < TiB) f"${bytes.toFloat / GiB.toFloat}%.3f GiB"
-      else f"${bytes.toFloat / TiB.toFloat}%.3f TiB"
+      else if (bytes < MiB) f"${bytes.toFloat / KiB.toFloat}%.1f KiB"
+      else if (bytes < GiB) f"${bytes.toFloat / MiB.toFloat}%.1f MiB"
+      else if (bytes < TiB) f"${bytes.toFloat / GiB.toFloat}%.1f GiB"
+      else f"${bytes.toFloat / TiB.toFloat}%.1f TiB"
     }
 
     def toInt = bytes
@@ -67,14 +84,19 @@ object binary {
       }
       else false
     }
-    def base64: String = Base64.encodeToString(data, Base64.DEFAULT)
+    def base64: String = Base64.encodeToString(data, Base64.DEFAULT).trim
     def sha1: Array[Byte] = MessageDigest.getInstance("SHA-1").digest(data)
     def toShort: Short = ByteBuffer.wrap(data).getShort
+    def utf8: String = new String(data, "UTF-8")
   }
 
   implicit class StringCyborgBinaryExt(val string: String) extends AnyVal {
     def decodeBase64: Array[Byte] = Base64.decode(string, Base64.DEFAULT)
+    def decodeBase64Option: Option[Array[Byte]] =
+      \/.fromTryCatchNull(Base64.decode(string, Base64.DEFAULT)).toOption
     def utf8: Array[Byte] = string.getBytes("UTF-8")
+    def base64encoded: String =
+      Base64.encodeToString(string.getBytes("UTF-8"), Base64.DEFAULT).trim
   }
 
   def arrayByteBuffer(size: Int) = ByteBuffer.wrap(Array.ofDim[Byte](size))
@@ -93,26 +115,5 @@ object binary {
       data.get(dst, 0, n)
       dst
     }
-  }
-
-  case class InvalidHexString(message: String) extends Exception(message)
-  private val spacesRegex = """\s+""".r
-  private val hexCharsRegex = """[0-9A-F]+""".r
-  implicit class HexStringCyborgExt(val string: String) extends AnyVal {
-    def hexToByteArray(minSize: Int = 0): Array[Byte] = {
-      val preprocess = spacesRegex replaceAllIn (string, "") toUpperCase()
-      if (preprocess.isEmpty)
-        Array.fill(minSize)(0.toByte)
-      else {
-        if (hexCharsRegex unapplySeq preprocess isEmpty)
-          throw InvalidHexString(s"'$preprocess' is not a hex string")
-        (for (byte <- preprocess.grouped(2)) yield
-          Integer.parseInt(byte, 16).toByte).toArray.reverse.padTo(minSize, 0.toByte).reverse
-      }
-    }
-
-    def hexToByteArrayOpt(minSize: Int = 0): Option[Array[Byte]] =
-      catching(classOf[InvalidHexString]).opt(hexToByteArray(minSize))
-
   }
 }

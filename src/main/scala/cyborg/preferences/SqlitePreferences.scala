@@ -8,6 +8,7 @@ import cyborg.crypto.CryptoKey
 import cyborg.db.SQLite._
 import cyborg.Log._
 import cyborg.util.control._
+import cyborg.util.execution.ScheduledExecutionContext
 import scalaz._, Scalaz._
 
 object SqlitePreferences {
@@ -18,9 +19,10 @@ object SqlitePreferences {
 
   class Preferences(val section: String,
                     val cryptoKey: CryptoKey,
-                    val androidPrefsSection: String)
+                    val androidPrefsSection: String,
+                    sqliteFailingCallback: Option[Throwable => Unit])
                    (implicit val context: Context) {
-    private def helper = DbOpenHelper()
+    private def helper = DbOpenHelper(sqliteFailingCallback)
 
     lazy val androidPrefs: Option[SharedPreferences] = {
       assert(context != null)
@@ -29,63 +31,80 @@ object SqlitePreferences {
       tryOption(context.getSharedPreferences(androidPrefsSection, Context.ModeMultiProcess))
     }
 
-    def apply[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
+    def apply[T](key: String)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Option[T] = {
       helper.read[Option[T]](db => prop.get(db, section, key)).toOption.flatten
         .orElse(androidPrefs.flatMap(ap => prop.getAndroidPref(ap, key)))
     }
 
-    def update[T](key: String, value: T)(implicit prop: PrefProp[T]) {
+    def update[T](key: String, value: T)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
       helper.write(db => prop.put(db, section, key, value))
     }
 
-    def ? (key: String)(implicit prop: PrefProp[Boolean]): Boolean = {
+    def put[T](pairs: List[(String, T)])(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
+      helper.write(db => prop.putMulti(db, section, pairs))
+    }
+
+    def ? (key: String)(implicit prop: PrefProp[Boolean], sec: ScheduledExecutionContext): Boolean = {
       helper.read(db => prop.?(db, section, key)).getOrElse(false)
     }
 
-    def delete(key: String) {
+    def delete(key: String)(implicit sec: ScheduledExecutionContext): Unit = {
       helper.write(_.delete("prime", "section = ? AND key = ?", section, key))
     }
 
-    def delete(keys: List[String]) {
+    def delete(keys: List[String])(implicit sec: ScheduledExecutionContext): Unit = {
       helper.writeTransaction { db =>
         keys map { key => db.delete("prime", "section = ? AND key = ?", section, key) }
       }
     }
 
-    def globDelete(glob: String) {
+    def exists(key: String)(implicit sec: ScheduledExecutionContext): Boolean = {
+      helper.read { db =>
+        db.raw("SELECT EXISTS(SELECT 1 FROM prime WHERE section = ? AND key = ? LIMIT 1)", section, key) { c =>
+          c.moveToFirst()
+          c.getInt(0) == 1
+        }
+      } getOrElse false
+    }
+
+    def glob[T](query: String)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): List[T] = {
+      helper.read(db => prop.glob(db, section, query)).getOrElse(List.empty)
+    }
+
+    def globDelete(glob: String)(implicit sec: ScheduledExecutionContext): Unit = {
       helper.write(_.delete("prime", "section = ? AND key GLOB ?", section, glob))
     }
 
-    def setOrDelete[T](key: String, value: Option[T])(implicit prop: PrefProp[T]) {
+    def setOrDelete[T](key: String, value: Option[T])(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
       value map (v => update[T](key, v)) getOrElse delete(key)
     }
 
-    def makeDefault[T](key: String, value: T)(implicit prop: PrefProp[T]) {
+    def makeDefault[T](key: String, value: T)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
       if (apply[T](key).isEmpty) update[T](key, value)
     }
 
-    def increment[T](key: String)(implicit prop: PrefProp[T]): Option[T] = {
+    def increment[T](key: String)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Option[T] = {
       helper.write(db => prop.increment(db, section, key)).toOption.flatten
     }
 
-    def all[T](implicit prop: PrefProp[T]): List[(String, T)] = {
+    def all[T](implicit prop: PrefProp[T], sec: ScheduledExecutionContext): List[(String, T)] = {
       helper.read(db => prop.all(db, section)).toOption.getOrElse(List.empty)
     }
 
     class PrefSet(val key: String) {
-      def += [T](value: T)(implicit prop: PrefProp[T]) {
+      def += [T](value: T)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
         helper.write(db => prop.setAdd(db, section, key, value))
       }
 
-      def replaceWith[T](list: List[T])(implicit prop: PrefProp[T]) {
+      def replaceWith[T](list: List[T])(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
         helper.write(db => prop.setReplace(db, section, key, list))
       }
 
-      def -= [T](value: T)(implicit prop: PrefProp[T]) {
+      def -= [T](value: T)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Unit = {
         helper.write(db => prop.setRemove(db, section, key, value))
       }
 
-      def delete() {
+      def delete()(implicit sec: ScheduledExecutionContext): Unit = {
         helper.writeTransaction { db =>
           db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
             if (check.isEmpty) { // Nothing there
@@ -106,14 +125,14 @@ object SqlitePreferences {
         }
       }
 
-      def contains[T](value: T)(implicit prop: PrefProp[T]): Boolean = {
+      def contains[T](value: T)(implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Boolean = {
         helper.read(db => prop.setContains(db, section, key, value)) getOrElse false
       }
 
-      def toList[T](implicit prop: PrefProp[T]): List[T] = {
+      def toList[T](implicit prop: PrefProp[T], sec: ScheduledExecutionContext): List[T] = {
         helper.read(db => prop.setGet(db, section, key)).getOrElse(List.empty)
       }
-      def toSet[T](implicit prop: PrefProp[T]): Set[T] = toList[T](prop).toSet
+      def toSet[T](implicit prop: PrefProp[T], sec: ScheduledExecutionContext): Set[T] = toList[T](prop, sec).toSet
     }
     def set(key: String) = new PrefSet(key)
 
@@ -121,13 +140,13 @@ object SqlitePreferences {
       import cyborg.util.binary._
       import cyborg.crypto.SimpleEncryption._
 
-      def apply[T](key: String)(implicit encryption: SimpleEncryption[T]): Option[T] = {
+      def apply[T](key: String)(implicit encryption: SimpleEncryption[T], sec: ScheduledExecutionContext): Option[T] = {
         (helper read { db =>
           for (str <- stringPrefProp.get(db, section, key)) yield decrypt[T](str.decodeBase64, cryptoKey)
         }).toOption.flatten
       }
 
-      def update[T](key: String, value: T)(implicit encryption: SimpleEncryption[T]) {
+      def update[T](key: String, value: T)(implicit encryption: SimpleEncryption[T], sec: ScheduledExecutionContext): Unit = {
         val data = encrypt[T](value, cryptoKey).base64
         helper.write(db => stringPrefProp.put(db, section, key, data))
       }
@@ -135,8 +154,9 @@ object SqlitePreferences {
     def secure = new PrefSecure
   }
 
-  class DbOpenHelper private (implicit context: Context) extends OpenHelper("CyborgPreferencesDb", 1) {
-    def onCreate(db: SQLiteDatabase) {
+  class DbOpenHelper private (sqliteFailingCallback: Option[Throwable => Unit])
+                             (implicit context: Context) extends OpenHelper("CyborgPreferencesDb", 1, sqliteFailingCallback) {
+    def onCreate(db: SQLiteDatabase): Unit = {
       db.exec(
         """
           | CREATE TABLE IF NOT EXISTS prime (
@@ -167,7 +187,7 @@ object SqlitePreferences {
       db.insert("meta", "property" -> "set_id", "value" -> 1)
     }
 
-    def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
+    def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int): Unit = {
       db.exec("DROP TABLE IF EXISTS prime;")
       db.exec("DROP TABLE IF EXISTS sets;")
       onCreate(db)
@@ -177,10 +197,10 @@ object SqlitePreferences {
   object DbOpenHelper {
     private var instance: Option[DbOpenHelper] = None
 
-    def apply()(implicit context: Context): DbOpenHelper = {
+    def apply(sqliteFailingCallback: Option[Throwable => Unit])(implicit context: Context): DbOpenHelper = {
       if (instance.isEmpty) {
         $d("*** CREATING PREFERENCES DB OPEN HELPER INSTANCE ***")
-        instance = Option(new DbOpenHelper)
+        instance = Option(new DbOpenHelper(sqliteFailingCallback))
       }
       instance.get
     }
@@ -191,12 +211,26 @@ object SqlitePreferences {
       db.raw("SELECT value FROM prime WHERE section = ? AND key = ?", section, key)(_.get("value")(getter))
     }
 
-    def put(db: SQLiteDatabase, section: String, key: String, value: T) {
+    def put(db: SQLiteDatabase, section: String, key: String, value: T): Unit = {
       //todo: delete set values from sets table if they exist
       db.replace("prime", "section" -> section, "key" -> key, "value" -> value, "setValue" -> 0)(stringContentValuesPutter, stringContentValuesPutter, putter, intContentValuesPutter)
+      ()
+    }
+
+    def putMulti(db: SQLiteDatabase, section: String, pairs: List[(String, T)]): Unit = {
+      db.transaction { db =>
+        for ((key, value) <- pairs) {
+          db.replace("prime", "section" -> section, "key" -> key, "value" -> value, "setValue" -> 0)(stringContentValuesPutter, stringContentValuesPutter, putter, intContentValuesPutter)
+        }
+      }.leftMap(t => $w("DB transaction failed: " + t.getStackTraceString))
+      ()
     }
 
     def ? (db: SQLiteDatabase, section: String, key: String): Boolean = get(db, section, key).isDefined
+
+    def glob(db: SQLiteDatabase, section: String, query: String): List[T] = {
+      db.raw("SELECT value FROM prime WHERE section = ? AND key GLOB ?", section, query)(_.toTypedList("value")(getter))
+    }
 
     def increment(db: SQLiteDatabase, section: String, key: String): Option[T] = {
       db.transaction { db =>
@@ -215,7 +249,7 @@ object SqlitePreferences {
       db.raw("SELECT value FROM meta WHERE property = ?", "set_id")(_.get[Long]("value"))
     }
 
-    def setAdd(db: SQLiteDatabase, section: String, key: String, value: T) {
+    def setAdd(db: SQLiteDatabase, section: String, key: String, value: T): Unit = {
       db.transaction { db =>
         db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
           if (check.isEmpty) { // New set, no previous value
@@ -236,10 +270,11 @@ object SqlitePreferences {
             }
           }
         }
-      }
+      }.leftMap(t => $w("DB transaction failed: " + t.getStackTraceString))
+      ()
     }
 
-    def setReplace(db: SQLiteDatabase, section: String, key: String, values: List[T]) {
+    def setReplace(db: SQLiteDatabase, section: String, key: String, values: List[T]): Unit = {
       db.transaction { db =>
         db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
           val optSetId = if (check.isEmpty) { // New set, no previous value
@@ -266,10 +301,11 @@ object SqlitePreferences {
             $e(s"CONFIG failed to get a set id for '$key'")
           }
         }
-      }
+      }.leftMap(t => $w("DB transaction failed: " + t.getStackTraceString))
+      ()
     }
 
-    def setRemove(db: SQLiteDatabase, section: String, key: String, value: T) {
+    def setRemove(db: SQLiteDatabase, section: String, key: String, value: T): Unit = {
       db.transaction { db =>
         db.raw("SELECT value, setValue FROM prime WHERE section = ? AND key = ?", section, key) { check =>
           if (check.isEmpty) { // Nothing there
@@ -286,7 +322,8 @@ object SqlitePreferences {
             }
           }
         }
-      }
+      }.leftMap(t => $w("DB transaction failed: " + t.getStackTraceString))
+      ()
     }
 
     def setQuery[A](db: SQLiteDatabase, section: String, key: String, errval: A)(f: Cursor => A): A = {
@@ -360,12 +397,15 @@ object SqlitePreferences {
   class JavaPreferences(androidContext: android.content.Context,
                         section: String,
                         cryptoKey: CryptoKey,
-                        androidPrefsSection: String) {
+                        androidPrefsSection: String,
+                        scheduledExecutionContext: ScheduledExecutionContext) {
     assert(androidContext != null)
     assert(section != null)
 
     implicit val context: Context = androidContext
-    val p = new Preferences(section, cryptoKey, androidPrefsSection)
+    implicit val sec = scheduledExecutionContext
+
+    val p = new Preferences(section, cryptoKey, androidPrefsSection, None)
 
     def getString(key: String, default: String): String = p[String](key) getOrElse default
     def getInt(key: String, default: Int): Int = p[Int](key) getOrElse default
@@ -374,11 +414,11 @@ object SqlitePreferences {
 
     def getSecureString(key: String, default: String): String = p.secure[String](key) getOrElse default
 
-    def setString(key: String, value: String) { p(key) = value }
-    def setInt(key: String, value: Int) { p(key) = value }
-    def setLong(key: String, value: Long) { p(key) = value }
-    def setBoolean(key: String, value: Boolean) { p(key) = value }
+    def setString(key: String, value: String): Unit = { p(key) = value }
+    def setInt(key: String, value: Int): Unit = { p(key) = value }
+    def setLong(key: String, value: Long): Unit = { p(key) = value }
+    def setBoolean(key: String, value: Boolean): Unit = { p(key) = value }
 
-    def setSecureString(key: String, value: String) { p.secure(key) = value }
+    def setSecureString(key: String, value: String): Unit = { p.secure(key) = value }
   }
 }

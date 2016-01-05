@@ -11,7 +11,6 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import scala.concurrent.duration._
 
 object control {
-  case class NotImplemented(message: String = "Not implemented") extends Exception(message)
   case class BreakException() extends Exception
   case class TimeoutException(message: String) extends Exception(message)
   case class LockedException() extends Exception
@@ -32,7 +31,10 @@ object control {
     \/.fromTryCatch(f).fold(l => {
       l.printStackTrace
       None
-    }, Option(_))
+    }, { r =>
+      if (r == null) cyborg.Log.$w("tryOption null value")
+      Option(r)
+    })
   }
 
   def tryElse[T](f: => T)(e: Exception => T) = handling(classOf[Exception])
@@ -133,7 +135,7 @@ object control {
                 }
                 else {
                   $d(s"RETRY because '${e.toString}'")
-                  //e.printStackTrace()
+                  e.printStackTrace()
                 }
             }
             finally {
@@ -143,7 +145,7 @@ object control {
           if (result.isEmpty && pause.toMillis > 0) {
             try { Thread.sleep(pause.toMillis) } catch { case e: InterruptedException => }
           }
-        } while (result.isEmpty && systemTime < startTime + waitTime)
+        } while (result.isEmpty /* && systemTime < startTime + waitTime */)
         result getOrElse {
           val e = TimeoutException("Timeout waiting for lock")
           e.printStackTrace()
@@ -168,14 +170,14 @@ object control {
   ) {
     import Monitor._
 
-    def reportProgress(progress: P) { progressObservers.map(_(progress)) }
+    def reportProgress(progress: P): Unit = { progressObservers.map(_(progress)) }
 
     def future: Future[A] = promise.future
     def isCompleted = promise.isCompleted
     def failure(t: Throwable) = promise failure t
     def success(v: A) = promise success v
 
-    def cancel(reason: String) {
+    def cancel(reason: String): Unit = {
       tracking map { other =>
         other.cancel(reason)
       } getOrElse {
@@ -211,7 +213,7 @@ object control {
       this
     }
 
-    def track[B](other: Monitor[B,P])(f: (B) => A)(implicit sec: ScheduledExecutionContext) {
+    def track[B](other: Monitor[B,P])(f: (B) => A)(implicit sec: ScheduledExecutionContext): Unit = {
       tracking = Some(other)
       other.future onComplete {
         case Success(result) => promise success f(result)

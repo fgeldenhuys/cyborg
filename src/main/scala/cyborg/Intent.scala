@@ -1,17 +1,18 @@
 package cyborg
 
-import android.content.{Intent => AIntent}
-import android.app.{Activity => AActivity}
+import android.content.{IntentSender, Intent => AIntent}
 import android.os.Parcelable
 import cyborg.Context._
 import cyborg.util.control._
+import cyborg.Activity.IntentCallbacks
 import scala.collection.JavaConversions._
 import scalaz._, Scalaz._, scalaz.concurrent._
 
+@deprecated("Use CyborgIntent", ":)")
 object Intent {
   trait ExtraProp[T] {
     def get(intent: AIntent, key: String): Option[T]
-    def set(intent: AIntent, key: String, value: T)
+    def set(intent: AIntent, key: String, value: T): Unit
   }
 
   def makeParcelableListExtraProp[T <: Parcelable](implicit prop: ExtraProp[T]): ExtraProp[List[T]] = new ExtraProp[List[T]] {
@@ -20,7 +21,7 @@ object Intent {
         extras <- intent.extras
         arrayList <- tryOption(extras.getParcelableArrayList[T](key))
       } yield arrayList.toList
-    override def set(intent: AIntent, key: String, value: List[T]) {
+    override def set(intent: AIntent, key: String, value: List[T]): Unit = {
       intent.putExtra(key, new java.util.ArrayList[T](value))
     }
   }
@@ -45,21 +46,33 @@ object Intent {
       for (extras <- intent.extras; value <- Option(extras.getBoolean(key))) yield value
     def set(intent: AIntent, key: String, value: Boolean): Unit = intent.putExtra(key, value)
   }
+  implicit val byteArrayExtraProp = new ExtraProp[Array[Byte]] {
+    def get(intent: AIntent, key: String): Option[Array[Byte]] =
+      for (extras <- intent.extras; value <- Option(extras.getByteArray(key))) yield value
+    def set(intent: AIntent, key: String, value: Array[Byte]): Unit = intent.putExtra(key, value)
+  }
+
+  implicit class IntentSenderExt(val self: IntentSender) {
+    def startIntentSenderForResult(implicit activity: android.app.Activity, ic: IntentCallbacks): Promise[cyborg.Activity.ActivityResult] =
+      Activity.startIntentSenderForResult(self)
+  }
 
   implicit class IntentExt(val self: AIntent) /* extends AnyVal */ { // Nested class not allowed
-    def start(implicit activity: Activity) { activity.startActivity(self) }
+    def start(implicit activity: android.app.Activity): Unit = { activity.startActivity(self) }
 
-    //def startForResult: Future((Int, Intent) => )
+    def startForResult(implicit activity: android.app.Activity, ic: IntentCallbacks): Promise[cyborg.Activity.ActivityResult] =
+      Activity.startIntentForResult(self)
 
-    def startForResult(requestCode: Int)(implicit activity: Activity) {
+    //def startForResult(requestCode: Int)(implicit activity: android.app.Activity) {
+    def startwithRequestCode(requestCode: Int)(implicit activity: android.app.Activity): Unit = {
       activity.startActivityForResult(self, requestCode)
     }
 
-    def broadcast()(implicit context: Context) {
+    def broadcast()(implicit context: Context): Unit = {
       context.sendBroadcast(self)
     }
 
-    def makeResult(resultCode: Int)(implicit activity: Activity): AIntent = {
+    def makeResult(resultCode: Int)(implicit activity: android.app.Activity): AIntent = {
       activity.setResult(resultCode, self)
       self
     }
@@ -77,7 +90,7 @@ object Intent {
     }
     val extra = new Extra
 
-    @deprecated def putExtras(extras: (String, Any)*) {
+    @deprecated def putExtras(extras: (String, Any)*): Unit = {
       for ((name, value) <- extras) {
         value match {
           case string: String => self.putExtra(name, string)
@@ -96,17 +109,13 @@ object Intent {
   }
 
   object Intent {
+    val ActionView = AIntent.ACTION_VIEW
+
     case class UnknownExtraTypeException(name: String, value: Any)
       extends Exception(s"Unknown extra type: $name -> ${value.toString}")
 
     def apply() = new AIntent()
     def apply[A](implicit context: Context, m: Manifest[A]) = new AIntent(context, /* m.runtimeClass*/ m.erasure)
     def apply(action: String) = new AIntent(action)
-
-    def view(data: android.net.Uri, tpe: String) = {
-      val i = new AIntent(AIntent.ACTION_VIEW)
-      i.setDataAndType(data, tpe)
-      i
-    }
   }
 }

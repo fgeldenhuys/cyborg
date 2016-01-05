@@ -7,26 +7,31 @@ import java.net.URL
 import java.security.cert.{CertificateFactory, X509Certificate}
 import java.security.{GeneralSecurityException, KeyStore}
 import javax.net.ssl._
+import cyborg.util.execution.ScheduledExecutionContext
 import org.apache.http.conn.ssl.AllowAllHostnameVerifier
 import scala.util.control.Exception._
+import cyborg.util.debug
 
 object HttpSecure extends Http {
   import Http._
 
   case class WrongCertificateAuthority() extends GeneralSecurityException("Wrong certificate authority")
 
-  protected def createConnection(url: String)(implicit params: HttpParameters): Either[Throwable, HttpsURLConnection] = {
+  protected def createConnection(url: String)
+                                (implicit params: HttpParameters, sec: ScheduledExecutionContext): Either[Throwable, HttpsURLConnection] = {
     System.setProperty("http.keepAlive", "false")
     catching(classOf[Exception]) either {
-      val http = new URL(url).openConnection.asInstanceOf[HttpsURLConnection]
-      http.setRequestProperty("Accept-Encoding", "identity")
-      http.setRequestProperty("Connection", "Close")
-      http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
-      http.setReadTimeout(params.readTimeout.toMillis.toInt)
-      if (params.chunked) http.setChunkedStreamingMode(0)
-      http.setHostnameVerifier(new AllowAllHostnameVerifier())
-      params.socketFactory.map(http setSSLSocketFactory _)
-      http
+      debug.warnAfterTime(1000) {
+        val http = new URL(url).openConnection.asInstanceOf[HttpsURLConnection]
+        http.setRequestProperty("Accept-Encoding", "identity")
+        http.setRequestProperty("Connection", "Close")
+        http.setConnectTimeout(params.connectTimeout.toMillis.toInt)
+        http.setReadTimeout(params.readTimeout.toMillis.toInt)
+        if (params.chunked) http.setChunkedStreamingMode(0)
+        http.setHostnameVerifier(new AllowAllHostnameVerifier())
+        params.socketFactory.map(http setSSLSocketFactory _)
+        http
+      }
     }
   }
 
@@ -56,8 +61,8 @@ object HttpSecure extends Http {
                           (implicit context: Context): X509TrustManager = {
     new X509TrustManager {
       def getAcceptedIssuers: Array[X509Certificate] = null
-      def checkClientTrusted(certs: Array[X509Certificate], authType: String) {}
-      def checkServerTrusted(certs: Array[X509Certificate], authType: String) {
+      def checkClientTrusted(certs: Array[X509Certificate], authType: String): Unit = {}
+      def checkServerTrusted(certs: Array[X509Certificate], authType: String): Unit = {
         val in = context.resources.openRawResource(pemResource)
         val cf = CertificateFactory.getInstance("X.509")
         val ca = cf.generateCertificate(in).asInstanceOf[X509Certificate]

@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteDatabase
 import cyborg.Context._
 import cyborg.db.SQLite._
 import cyborg.Log._
+import cyborg.util.execution.ScheduledExecutionContext
 import cyborg.util.io._
 import cyborg.util.control._
 import java.io._
@@ -11,7 +12,7 @@ import java.io._
 class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   import cyborg.db.KeyValue.KeyValueException
 
-  def close() { stackTraceHandler(Unit) { sqlite.close() } }
+  def close(): Unit = { stackTraceHandler(()) { sqlite.close() } }
   def transaction[T](f: (KeyValue) => T): Option[T] = sqlite.transaction { db => f(this) } .toOption
 
   private val applyQuery = s"SELECT value FROM '$bucket' WHERE key = ?"
@@ -28,17 +29,17 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   def apply(key: String): Option[String] = sqlite.raw(applyQuery, key)(_.get[String]("value"))
 
   // Update a single value
-  def update(key: String, value: String) {
+  def update(key: String, value: String): Unit = {
     val result = sqlite.replace(bucket, "key" -> key, "value" -> value)
     if (result.isEmpty) throw KeyValueException(s"binary.update($key) failed")
   }
 
   // Delete an entry
-  def del(key: String) {
+  def del(key: String): Unit = {
     sqlite.delete(bucket, "key = ?", key)
   }
 
-  def del(keys: Seq[String]) {
+  def del(keys: Seq[String]): Unit = {
     for (key <- keys) sqlite.delete(bucket, "key = ?", key)
   }
 
@@ -50,7 +51,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
   }
 
   // Glob delete
-  def findAndDel(glob: String) {
+  def findAndDel(glob: String): Unit = {
     sqlite.delete(bucket, "key GLOB ?", glob)
   }
 
@@ -86,7 +87,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     def apply(key: String): Option[Array[Byte]] = sqlite.raw(applyQuery, key)(_.get[Array[Byte]]("value"))
 
     // Update a single blob value
-    def update(key: String, value: Array[Byte]) {
+    def update(key: String, value: Array[Byte]): Unit = {
       val result = sqlite.replace(bucket, "key" -> key, "value" -> value)
       if (result.isEmpty) throw KeyValueException(s"binary.update($key) failed")
     }
@@ -111,13 +112,13 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     def apply(find: String): List[String] =
       sqlite.raw(stringIndexQuery, s"%$find%")(_.toList("value"))
 
-    def update(key: String, string: String) {
+    def update(key: String, string: String): Unit = {
       sqlite.update(bucket, "stringindex" -> string, "key = ?", key)
     }
   }
   val stringIndex = new StringIndex
 
-  def exportToOutputStream(out: OutputStream) {
+  def exportToOutputStream(out: OutputStream): Unit = {
     val data = sqlite.raw(exportQuery)(_.toBlobList)
     out << ExportIdentifier << ExportVersion << data.size
     for (row <- data) {
@@ -138,7 +139,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     }
   }
 
-  def exportToFile(file: File) {
+  def exportToFile(file: File): Unit = {
     val out = new BufferedOutputStream(new FileOutputStream(file))
     exportToOutputStream(out)
     out.close()
@@ -146,7 +147,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
 
   case class ImportException(message: String) extends Exception(message)
 
-  def importFromInputStream(in: InputStream) {
+  def importFromInputStream(in: InputStream): Unit = {
     if (in.string(ExportIdentifier.size) != ExportIdentifier) throw ImportException("Export identifier mismatch")
     if (in.int != ExportVersion) throw ImportException("Export version unknown")
     val entries = in.int
@@ -176,7 +177,7 @@ class KeyValue(val sqlite: SQLiteDatabase, val bucket: String) {
     }
   }
 
-  def importFromFile(file: File) {
+  def importFromFile(file: File): Unit = {
     val in = new BufferedInputStream(new FileInputStream(file))
     importFromInputStream(in)
     in.close()
@@ -190,25 +191,26 @@ object KeyValue {
     $e(cyborg.util.debug.getStackTrace)
   }
 
-  class DbOpenHelper()(implicit context: Context)
-    extends OpenHelper("CyborgKeyValueDb", 1) {
+  class DbOpenHelper(sqliteFailingCallback: Option[Throwable => Unit])(implicit context: Context)
+    extends OpenHelper("CyborgKeyValueDb", 1, sqliteFailingCallback) {
 
-    override def onOpen(db: SQLiteDatabase) {
+    override def onOpen(db: SQLiteDatabase): Unit = {
     }
 
-    def onCreate(db: SQLiteDatabase) {
+    def onCreate(db: SQLiteDatabase): Unit = {
     }
 
-    def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) {
+    def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int): Unit = {
     }
   }
 
   private var instance: Option[DbOpenHelper] = None
 
-  def helper(bucket: String)(implicit context: Context): DbOpenHelper = {
+  def helper(bucket: String, sqliteFailingCallback: Option[Throwable => Unit])
+            (implicit context: Context, sec: ScheduledExecutionContext): DbOpenHelper = {
     if (instance.isEmpty) {
       $d("*** CREATING KEYVALUE DB OPEN HELPER INSTANCE ***")
-      instance = Option(new DbOpenHelper)
+      instance = Option(new DbOpenHelper(sqliteFailingCallback))
     }
     instance.map(_.write(_.execSQL(s"""
           | CREATE TABLE IF NOT EXISTS '$bucket' (

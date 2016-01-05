@@ -3,6 +3,8 @@ package cyborg.graphics
 import android.graphics.{Bitmap => B, BitmapFactory => BF}
 import java.io.{InputStream, File, ByteArrayOutputStream}
 import scalaz._
+import cyborg.util.io._
+import cyborg.util.scalazext._
 
 object Bitmap {
   object BitmapFormat {
@@ -14,6 +16,10 @@ object Bitmap {
     case class Png(quality: Int = 100) extends Format { def format = B.CompressFormat.PNG }
     //WARNING: WebP transparency support was only added in Android 4.2
     case class WebP(quality: Int = 100) extends Format { def format = B.CompressFormat.WEBP }
+  }
+
+  implicit object BitmapInputStreamConverter extends InputStreamConverter[B] {
+    override def readAs(in: InputStream): Throwable \/ B = \/.fromTryCatchNull(BF.decodeStream(in.drop(1)))
   }
 
   implicit class CyborgBitmapExt(val b: B) extends AnyVal {
@@ -47,7 +53,7 @@ object Bitmap {
     }
   }
 
-  def makeBitmap(bytes: Array[Byte]): Throwable \/ B = \/.fromTryCatch(BF.decodeByteArray(bytes, 0, bytes.length))
-  def makeBitmap(file: File): Throwable \/ B = \/.fromTryCatch(BF.decodeFile(file.getAbsolutePath))
-  def makeBitmap(in: InputStream): Throwable \/ B = \/.fromTryCatch(BF.decodeStream(in))
+  def makeBitmap(bytes: Array[Byte]): Throwable \/ B = \/.fromTryCatchNull(BF.decodeByteArray(bytes, 0, bytes.length))
+  def makeBitmap(file: File): Throwable \/ B = \/.fromTryCatchNull(BF.decodeFile(file.getAbsolutePath))
+  def makeBitmap(in: InputStream): Throwable \/ B = \/.fromTryCatchNull(BF.decodeStream(in))
 }

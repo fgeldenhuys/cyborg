@@ -2,18 +2,22 @@ package cyborg
 
 import android.app.AlertDialog
 import android.content.DialogInterface
+import android.content.DialogInterface.OnClickListener
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.view.inputmethod.InputMethodManager
 import android.view.View
-import android.view.WindowManager.BadTokenException
 import android.widget.{EditText, Toast}
 import Context._
 import cyborg.Log._
-import cyborg.util.events.Observable
+import cyborg.util.execution.ScheduledExecutionContext
+import cyborg.util.task._
 import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent._
+import scalaz.concurrent.{Promise => PromiseZ}
+import scalaz.concurrent.Task
+import scalaz._
 
+@deprecated("Use CyborgActivity", ":)")
 class Activity extends android.app.Activity {
   implicit val context: Context = this
   implicit val activity: Activity = this
@@ -25,21 +29,24 @@ class Activity extends android.app.Activity {
     candidate
   }
 
-  def runOnUiThread(f: => Any) {
+  @deprecated("Use the function on the object")
+  def runOnUiThreadOld(f: => Any)(implicit sec: ScheduledExecutionContext): Unit = {
     try {
       super.runOnUiThread(new Runnable {
-        def run() { f }
+        def run(): Unit = {
+          cyborg.util.debug.warnAfterTime(1000)(f)
+        }
       })
     } catch {
-      case e: BadTokenException =>
-        $w("runOnUiThread FAILED!")
-        e.printStackTrace()
+      case t: Throwable =>
+        $w("runOnUiThread FAILED : " + t)
+        t.printStackTrace()
     }
   }
 
   def findView[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
 
-  def invalidateRootView() {
+  def invalidateRootView(): Unit = {
     findViewById(android.R.id.content).invalidate()
   }
 
@@ -57,19 +64,17 @@ class Activity extends android.app.Activity {
     (rect.width(), rect.height())
   }
 
-  def hideKeyboard() {
-    val inputManager = getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
-      .asInstanceOf[InputMethodManager]
-    inputManager.hideSoftInputFromWindow(getCurrentFocus.getWindowToken,
-      InputMethodManager.HIDE_NOT_ALWAYS)
-  }
-
 }
 
 object Activity {
   sealed trait ActivityResultCode { def code: Int }
   case class ActivityResultOk(code: Int = android.app.Activity.RESULT_OK) extends ActivityResultCode
   case class ActivityResultCanceled(code: Int = android.app.Activity.RESULT_CANCELED) extends ActivityResultCode
+
+  sealed trait DialogResult
+  case object DialogPositiveResult extends DialogResult
+  case object DialogNeutralResult extends DialogResult
+  case object DialogNegativeResult extends DialogResult
 
   val ResultOk = android.app.Activity.RESULT_OK
   val ResultCanceled = android.app.Activity.RESULT_CANCELED
@@ -89,83 +94,140 @@ object Activity {
   case class ActivityResult(code: ActivityResultCode, data: Option[android.content.Intent])
 
   class IntentCallbacks {
-    val map = scala.collection.mutable.HashMap.empty[Int, Promise[ActivityResult]]
+    val map = scala.collection.mutable.HashMap.empty[Int, PromiseZ[ActivityResult]]
     var nextRequestCode = new AtomicInteger(1001)
 
     def onActivityResult(requestCode: Int, result: ActivityResult): Boolean = {
       map.get(requestCode).fold (false) { p =>
-        p success result
+        p fulfill result
         map remove requestCode
         true
       }
     }
   }
 
-  def runOnUiThread(f: => Any)(implicit activity: Activity) {
-    activity.runOnUiThread(f)
+  def runOnUiThread(f: => Any)(implicit activity: Activity, sec: ScheduledExecutionContext): Unit = {
+    val st = cyborg.util.debug.getStackTrace
+    try {
+      activity.runOnUiThread(new Runnable {
+        def run(): Unit = {
+          cyborg.util.debug.warnAfterTimeWith(1000, st)(f)
+        }
+      })
+    } catch {
+      case t: Throwable =>
+        $w("runOnUiThread FAILED : " + t)
+        t.printStackTrace()
+    }
   }
 
+  def inUiThread = android.os.Looper.myLooper() == android.os.Looper.getMainLooper()
+
   def startIntentForResult(intent: android.content.Intent)
-                          (implicit activity: Activity, ic: IntentCallbacks): Future[ActivityResult] = {
+                          (implicit activity: android.app.Activity, ic: IntentCallbacks): PromiseZ[ActivityResult] = {
+    import scalaz.concurrent.Promise._
     val rc = ic.nextRequestCode.addAndGet(1)
-    val p = promise[ActivityResult]
+    val p = emptyPromise[ActivityResult]
     ic.map += ((rc, p))
     activity.startActivityForResult(intent, rc)
-    p.future
+    p
+  }
+
+  def startIntentSenderForResult(is: android.content.IntentSender)
+    (implicit activity: android.app.Activity, ic: IntentCallbacks): PromiseZ[ActivityResult] = {
+    import scalaz.concurrent.Promise._
+    val rc = ic.nextRequestCode.addAndGet(1)
+    val p = emptyPromise[ActivityResult]
+    ic.map += ((rc, p))
+    activity.startIntentSenderForResult(is, rc, null, 0, 0, 0)
+    p
   }
 
   def toast(message: String, duration: ToastDuration = ToastShort)(implicit activity: android.app.Activity): Toast = {
     val t = Toast.makeText(activity, message, duration.value)
-    activity.runOnUiThread(new Runnable { def run() { t.show() } })
+    activity.runOnUiThread(new Runnable { def run(): Unit = { t.show() } })
     t
   }
 
-  def alert(title: String, message: String)(implicit activity: android.app.Activity): Future[Boolean] = {
+  def alert(title: String, message: String)(implicit activity: android.app.Activity): scala.concurrent.Future[Boolean] = {
+    import scala.concurrent._
     val p = promise[Boolean]
     try {
       val dialog = new AlertDialog.Builder(activity)
       dialog.setTitle(title).setMessage(message)
       dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
-        def onClick(dialog: DialogInterface, button: Int) { p success true }
+        def onClick(dialog: DialogInterface, button: Int): Unit = { \/.fromTryCatch(p success true) }
       })
       activity.runOnUiThread(new Runnable {
-        override def run() { dialog.show() }
+        override def run(): Unit = {
+          \/.fromTryCatch(dialog.show()).leftMap(_.printStackTrace())
+        }
       })
     }
     catch {
       case e: Exception =>
         e.printStackTrace()
-        p failure e
+        \/.fromTryCatch(p failure e)
     }
     p.future
   }
 
-  def confirm(title: String, message: String)
-             (implicit activity: android.app.Activity): Future[Boolean] = {
-    val p = promise[Boolean]
+  def confirm(title: String, message: String, positive: String = "Yes", negative: String = "No")
+             (implicit activity: android.app.Activity): PromiseZ[DialogResult] = {
+    import scalaz.concurrent.Promise._
+    val p = emptyPromise[DialogResult]
     try {
       val dialog = new AlertDialog.Builder(activity)
       dialog.setTitle(title).setMessage(message)
-      dialog.setPositiveButton("Yes", new DialogInterface.OnClickListener {
-        def onClick(dialog: DialogInterface, button: Int) { p success true }
+      dialog.setPositiveButton(positive, new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int): Unit = { p.fulfill(DialogPositiveResult) }
       })
-      dialog.setNegativeButton("No", new DialogInterface.OnClickListener {
-        def onClick(dialog: DialogInterface, button: Int) { p success false }
+      dialog.setNegativeButton(negative, new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int): Unit = { p.fulfill(DialogNegativeResult) }
       })
       activity.runOnUiThread(new Runnable {
-        override def run() { dialog.show() }
+        override def run(): Unit = { dialog.show() }
       })
     }
     catch {
       case e: Exception =>
         e.printStackTrace()
-        p failure e
+        p.break
     }
-    p.future
+    p
+  }
+
+  def confirmWithNeutral(title: String, message: String, positive: String, neutral: String, negative: String)
+                        (implicit activity: android.app.Activity): PromiseZ[DialogResult] = {
+    import scalaz.concurrent.Promise._
+    val p = emptyPromise[DialogResult]
+    try {
+      val dialog = new AlertDialog.Builder(activity)
+      dialog.setTitle(title).setMessage(message)
+      dialog.setPositiveButton(positive, new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int): Unit = { p.fulfill(DialogPositiveResult) }
+      })
+      dialog.setNeutralButton(neutral, new OnClickListener {
+        override def onClick(p1: DialogInterface, p2: Int): Unit = { p.fulfill(DialogNeutralResult) }
+      })
+      dialog.setNegativeButton(negative, new DialogInterface.OnClickListener {
+        def onClick(dialog: DialogInterface, button: Int): Unit = { p.fulfill(DialogNegativeResult) }
+      })
+      activity.runOnUiThread(new Runnable {
+        override def run(): Unit = { dialog.show() }
+      })
+    }
+    catch {
+      case e: Exception =>
+        e.printStackTrace()
+        p.break
+    }
+    p
   }
 
   def prompt(title: String, message: String, text: String = "")
-            (implicit activity: android.app.Activity): Future[Option[String]] = {
+            (implicit activity: android.app.Activity): scala.concurrent.Future[Option[String]] = {
+    import scala.concurrent._
     val p = promise[Option[String]]
     try {
       val dialog = new AlertDialog.Builder(activity)
@@ -174,13 +236,13 @@ object Activity {
       input.setText(text)
       dialog.setView(input)
       dialog.setPositiveButton("Ok", new DialogInterface.OnClickListener {
-        def onClick(dialog: DialogInterface, button: Int) { p success Some(input.getText.toString) }
+        def onClick(dialog: DialogInterface, button: Int): Unit = { p success Some(input.getText.toString) }
       })
       dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener {
-        def onClick(dialog: DialogInterface, button: Int) { p success None }
+        def onClick(dialog: DialogInterface, button: Int): Unit = { p success None }
       })
       activity.runOnUiThread(new Runnable {
-        override def run() { dialog.show() }
+        override def run(): Unit = { dialog.show() }
       })
     }
     catch {
@@ -191,9 +253,13 @@ object Activity {
     p.future
   }
 
-  implicit class ActivityObservableExtensions[T](val obs: Observable[T, Any]) extends AnyVal {
-    def subOnUiThread(f: (T) => Any)(implicit activity: Activity): (T) => Any = {
-      obs sub { v => activity.runOnUiThread(f(v)) }
-    }
+  def hideKeyboard(activity: android.app.Activity): Unit = {
+    val inputManager = activity
+      .getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+      .asInstanceOf[InputMethodManager]
+    inputManager
+      .hideSoftInputFromWindow(activity.getCurrentFocus.getWindowToken,
+      InputMethodManager.HIDE_NOT_ALWAYS)
   }
+
 }

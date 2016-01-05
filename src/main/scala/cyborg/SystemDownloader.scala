@@ -1,3 +1,4 @@
+/*
 package cyborg
 
 import android.app.{DownloadManager => DM}
@@ -16,8 +17,8 @@ import cyborg.util.io._
 import java.io.File
 import java.util.UUID
 import scala.collection.mutable
-import scala.concurrent.duration._
 import scala.concurrent._
+import cyborg.util.duration._, DurationDSL._
 
 class SystemDownloader(
                         val onSuccess: (String) => Any,
@@ -297,3 +298,4 @@ object SystemDownloader {
     }
   }
 }
+*/

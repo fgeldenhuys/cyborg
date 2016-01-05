@@ -21,7 +21,7 @@ object Parcel {
 
   trait ParcelValue[T] {
     def read(p: P): T
-    def write(p: P, value: T)
+    def write(p: P, value: T): Unit
   }
 
   implicit val parcelIntValue = new ParcelValue[Int] {
